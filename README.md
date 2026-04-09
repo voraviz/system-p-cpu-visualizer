@@ -11,7 +11,7 @@
   - [Data Formats](#data-formats)
     - [`config.ini`](#configini)
     - [CSV Performance Data](#csv-performance-data)
-    - [Example Data Generation (Python)](#example-data-generation-python)
+  - [Example Data Generation (Python)](#example-data-generation-python)
   - [Technologies Used](#technologies-used)
   - [Development](#development)
 
@@ -54,9 +54,11 @@ cpu-utilization-visualizer/
 
 ### Machine CPU Utilization (Sum by Pool)
 
+![](images/machine.png)
 
 ### LPAR CPU Utilization (by Date)
 
+![](images/lpar.png)
 
 ## How to Use
 
@@ -102,39 +104,16 @@ cpu-utilization-visualizer/
     04/02/2026,3.2,3.5,3.8,...,3.0,2.8
     ```
     <!-- -   (Note: The last 3 columns mentioned in `requirements.md` for max, p90, p95 are currently ignored by the visualizer, as it calculates these dynamically from the 288 intervals.) -->
-### Example Data Generation (Python)
- 
-```python
-import pandas as pd
-import numpy as np
- 
-# Generate sample data for an LPAR
-dates = pd.date_range('2025-04-01', '2026-01-31', freq='D')
-data = []
- 
-for date in dates:
-    # Generate 288 random CPU values (5-min intervals)
-    cpu_values = np.random.uniform(1.0, 8.0, 288)
-    
-    row = [date.strftime('%m/%d/%Y')] + list(cpu_values) + [
-        np.max(cpu_values),                          # Max
-        np.percentile(cpu_values, 90),               # P90
-        np.percentile(cpu_values, 95)                # P95
-    ]
-    data.append(row)
- 
-# Save to CSV
-columns = ['Date'] + [f'{h:02d}:{m:02d}' for h in range(24) for m in range(0, 60, 5)] + ['Max', 'P90', 'P95']
-df = pd.DataFrame(data, columns=columns)
-df.to_csv('data/lpar1.csv', index=False)
-```
+## Example Data Generation (Python)
+
+ [Data Generator](DATA_GENERATOR_GUIDE.md)
 
 ## Technologies Used
 
 -   **HTML5:** Structure of the web page.
 -   **CSS3:** Styling.
 -   **JavaScript (ES6+):** Core logic for data parsing, calculations, and UI interaction.
--   **Chart.js:** For rendering interactive charts.
+-   **Chart.js:** For rendering interactive charts. Loaded via CDN
 
 ## Development
 
