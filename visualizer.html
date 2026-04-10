@@ -7,11 +7,12 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 20px; background-color: #f4f7f6; }
-        .container { max-width: 1200px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        h1 { color: #333; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        .container { max-width: 1400px; margin: auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+        h1 { color: #333; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 25px; }
         
-        .upload-section { display: flex; gap: 20px; margin-bottom: 20px; padding: 15px; background: #e9ecef; border-radius: 5px; }
-        .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        /* Layout Sections */
+        .upload-section { display: flex; gap: 20px; margin-bottom: 25px; padding: 15px; background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 8px; }
+        .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; padding: 20px; border: 1px solid #ddd; border-radius: 8px; background: #fff; }
         
         .checkbox-group { 
             display: grid; 
@@ -26,25 +27,41 @@
         .checkbox-item:hover { background-color: #f0f7ff; }
         .checkbox-item input { width: auto; cursor: pointer; }
 
-        .summary-dashboard { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
-        .stat-card { flex: 1; min-width: 120px; background: #fff; border: 1px solid #e0e0e0; padding: 12px; border-radius: 8px; text-align: center; border-top: 4px solid #007bff; }
-        .stat-card h3 { margin: 0; font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 0.5px; }
-        .stat-val { font-size: 20px; font-weight: bold; color: #333; margin: 5px 0; }
-        .stat-date { font-size: 11px; color: #007bff; font-weight: bold; margin-bottom: 4px; }
-        .stat-label { font-size: 10px; color: #888; }
+        /* Summary Dashboards */
+        .summary-dashboard { display: flex; gap: 15px; margin-bottom: 25px; flex-wrap: wrap; }
+        .stat-card { 
+            flex: 1; 
+            min-width: 150px; 
+            background: #fff; 
+            border: 1px solid #e0e0e0; 
+            padding: 15px; 
+            border-radius: 10px; 
+            text-align: center; 
+            border-top: 5px solid #007bff;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.03);
+        }
+        .stat-card h3 { margin: 0; font-size: 11px; color: #777; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 5px; }
+        .stat-val { font-size: 26px; font-weight: bold; color: #222; margin: 2px 0; }
+        .stat-date { font-size: 12px; color: #007bff; font-weight: 600; margin-bottom: 5px; }
+        .stat-label { font-size: 11px; color: #999; }
 
-        .pool-breakdown { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px; margin-top: 10px; border-top: 1px dashed #ccc; padding-top: 15px; }
-        .pool-card { background: #f9f9f9; border: 1px solid #ddd; padding: 10px; border-radius: 6px; font-size: 12px; }
-        .pool-card h4 { margin: 0 0 8px 0; color: #444; border-bottom: 1px solid #eee; }
+        /* Pool Breakdown Specifics */
+        .pool-breakdown { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 15px; margin-top: 10px; }
+        .pool-card { background: #fff; border: 1px solid #e0e0e0; padding: 15px; border-radius: 8px; border-top: 4px solid #6c757d; }
+        .pool-card h4 { margin: 0 0 10px 0; font-size: 14px; color: #444; border-bottom: 1px solid #f0f0f0; padding-bottom: 5px; }
+        .pool-stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .pool-sub-label { font-size: 11px; font-weight: bold; color: #666; }
+        .pool-sub-val { font-size: 16px; font-weight: bold; color: #333; }
+        .pool-sub-date { font-size: 10px; color: #888; margin-top: 2px; }
 
-        .tabs { border-bottom: 2px solid #ddd; margin-bottom: 20px; }
-        .tab-btn { padding: 10px 20px; cursor: pointer; border: none; background: none; font-size: 16px; font-weight: bold; color: #666; }
+        .tabs { border-bottom: 2px solid #ddd; margin-bottom: 25px; }
+        .tab-btn { padding: 12px 24px; cursor: pointer; border: none; background: none; font-size: 15px; font-weight: bold; color: #888; transition: 0.3s; }
         .tab-btn.active { color: #007bff; border-bottom: 3px solid #007bff; }
-        .chart-container { position: relative; height: 500px; width: 100%; margin-top: 20px; }
+        .chart-container { position: relative; height: 550px; width: 100%; margin-top: 20px; padding: 10px; background: #fff; border: 1px solid #eee; border-radius: 8px; }
         label { display: block; font-weight: bold; margin-bottom: 8px; font-size: 14px; color: #444; }
-        select, input[type="file"] { width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #ccc; }
+        select, input[type="file"] { width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; background: #fff; }
         .hidden { display: none !important; }
-        .section-title { font-size: 14px; font-weight: bold; color: #555; margin-bottom: 10px; width: 100%; }
+        .section-title { font-size: 16px; font-weight: bold; color: #444; margin: 20px 0 15px 0; padding-left: 10px; border-left: 5px solid #007bff; }
     </style>
 </head>
 <body>
@@ -69,16 +86,15 @@
     </div>
 
     <div id="machineSummary">
-        <div class="section-title">Overall Machine Totals</div>
-        <div class="summary-dashboard">
+        <div class="summary-dashboard" id="machineTotals">
             <div class="stat-card" style="border-top-color: #28a745;">
-                <h3 id="minLabel">Min of Period</h3>
+                <h3 id="minLabel">MACHINE MIN</h3>
                 <div id="statMinDate" class="stat-date">-</div>
                 <div id="statMin" class="stat-val">0.00</div>
                 <div class="stat-label">Cores</div>
             </div>
             <div class="stat-card" style="border-top-color: #dc3545;">
-                <h3 id="maxLabel">Max of Period</h3>
+                <h3 id="maxLabel">MACHINE MAX</h3>
                 <div id="statMaxDate" class="stat-date">-</div>
                 <div id="statMax" class="stat-val">0.00</div>
                 <div class="stat-label">Cores</div>
@@ -103,169 +119,89 @@
     </div>
 
     <div id="machineControls" class="controls">
-        <div>
-            <label>Select Machine</label>
-            <select id="machineSelect" onchange="populatePoolCheckboxes()"></select>
-        </div>
-        <div>
-            <label>Metric Selection</label>
-            <select id="metricSelect" onchange="updateMachineChart()">
-                <option value="Max">Max</option>
-                <option value="p95">Percentile 95</option>
-                <option value="p90">Percentile 90</option>
-                <option value="p80">Percentile 80</option>
-                <option value="p70">Percentile 70</option>
-                <option value="p60">Percentile 60</option>
-                <option value="p50">Percentile 50</option>
-                <option value="Avg">Average</option>
-            </select>
-        </div>
-        <div style="grid-column: span 2;">
-            <label>CPU Pools (Toggle Display)</label>
-            <div id="poolCheckboxes" class="checkbox-group"></div>
-        </div>
+        <div><label>Select Machine</label><select id="machineSelect" onchange="populatePoolCheckboxes()"></select></div>
+        <div><label>Metric Selection</label><select id="metricSelect" onchange="updateMachineChart()">
+            <option value="Max">Max</option><option value="p95">P95</option><option value="p90">P90</option>
+            <option value="p80">P80</option><option value="p70">P70</option><option value="p60">P60</option>
+            <option value="p50">P50</option><option value="Avg">Average</option>
+        </select></div>
+        <div style="grid-column: span 2;"><label>CPU Pools (Toggle Display)</label><div id="poolCheckboxes" class="checkbox-group"></div></div>
     </div>
 
     <div id="lparControls" class="controls hidden">
-        <div>
-            <label>Select Machine</label>
-            <select id="lparMachineSelect" onchange="populateLparList()"></select>
-        </div>
-        <div>
-            <label>Select Date</label>
-            <select id="dateSelect" onchange="updateLparChart()"></select>
-        </div>
-        <div style="grid-column: span 2;">
-            <label>Select LPARs</label>
-            <div id="lparCheckboxes" class="checkbox-group"></div>
-        </div>
+        <div><label>Select Machine</label><select id="lparMachineSelect" onchange="selectedLpars.clear(); populateLparList()"></select></div>
+        <div><label>Select Date</label><select id="dateSelect" onchange="updateLparChart()"></select></div>
+        <div style="grid-column: span 2;"><label>Select LPARs</label><div id="lparCheckboxes" class="checkbox-group"></div></div>
     </div>
 
-    <div class="chart-container">
-        <canvas id="cpuChart"></canvas>
-    </div>
+    <div class="chart-container"><canvas id="cpuChart"></canvas></div>
 </div>
 
 <script>
-    let config = {};
-    let lparData = {};
-    let percentileMethod = 'INC'; // Default to INC
-    let standbyValue = 0.1; // Default to 0.1 core
-    let allDates = new Set();
-    let currentTab = 'machine';
-    let chart = null;
+    let config = {}, lparData = {}, percentileMethod = 'INC', standbyValue = 0.1, allDates = new Set(), currentTab = 'machine', chart = null, selectedLpars = new Set(), selectedPools = new Set();
 
-    // --- Data Parsing ---
-    // document.getElementById('iniUpload').addEventListener('change', async (e) => {
-    //     const text = await e.target.files[0].text();
-    //     const lines = text.split(/\r?\n/);
-    //     let currentMachine = '';
-    //     config = {};
-    //     lines.forEach(line => {
-    //         line = line.trim();
-    //         if (!line || line.startsWith(';') || line.startsWith('#')) return;
-    //         if (line.startsWith('[') && line.endsWith(']')) {
-    //             currentMachine = line.substring(1, line.length - 1);
-    //             config[currentMachine] = {};
-    //         } else if (line.includes('=') && currentMachine) {
-    //             const [pool, lpars] = line.split('=');
-    //             config[currentMachine][pool.trim()] = lpars.split(',').map(s => s.trim());
-    //         }
-    //     });
-    //     updateSelectors();
-    // });
     document.getElementById('iniUpload').addEventListener('change', async (e) => {
-        const text = await e.target.files[0].text();
-        const lines = text.split(/\r?\n/);
-        let currentSection = '';
-        config = {}; // Reset configuration
-
+        const text = await e.target.files[0].text(), lines = text.split(/\r?\n/);
+        let currentSection = ''; config = {};
         lines.forEach(line => {
-            line = line.trim();
-            if (!line || line.startsWith(';') || line.startsWith('#')) return;
-
+            line = line.trim(); if (!line || line.startsWith(';') || line.startsWith('#')) return;
             if (line.startsWith('[') && line.endsWith(']')) {
                 currentSection = line.substring(1, line.length - 1).toUpperCase();
-                if (currentSection !== 'MAIN') {
-                    config[currentSection] = {};
-                }
+                if (currentSection !== 'MAIN') config[currentSection] = {};
             } else if (line.includes('=') && currentSection) {
                 const [key, val] = line.split('=');
-                const trimmedKey = key.trim().toUpperCase();
-                const trimmedVal = val.trim();
-
                 if (currentSection === 'MAIN') {
-                    if (trimmedKey === 'PERCENTILE') percentileMethod = trimmedVal.toUpperCase();
-                    if (trimmedKey === 'STANDBY') standbyValue = parseFloat(trimmedVal) || 0.1;
-                } else {
-                    // Regular machine/pool definition
-                    config[currentSection][key.trim()] = trimmedVal.split(',').map(s => s.trim());
-                }
+                    if (key.trim().toUpperCase() === 'PERCENTILE') percentileMethod = val.trim().toUpperCase();
+                    if (key.trim().toUpperCase() === 'STANDBY') standbyValue = parseFloat(val.trim()) || 0.1;
+                } else config[currentSection][key.trim()] = val.trim().split(',').map(s => s.trim());
             }
         });
         updateSelectors();
     });
+
     document.getElementById('csvUpload').addEventListener('change', async (e) => {
         const files = Array.from(e.target.files);
         for (const file of files) {
-            const lparName = file.name.replace('.csv', '').toUpperCase();
-            const text = await file.text();
+            const lparName = file.name.replace('.csv', '').toUpperCase(), text = await file.text();
             parseCSV(lparName, text);
         }
         updateSelectors();
     });
 
     function parseCSV(lpar, text) {
-        const rows = text.split(/\r?\n/);
-        lparData[lpar] = {};
+        const rows = text.split(/\r?\n/); lparData[lpar] = {};
         rows.slice(1).forEach(row => {
-            const cols = row.split(',');
-            if (cols.length < 289) return; 
-            const date = cols[0].trim();
-            if (!date) return;
+            const cols = row.split(','); if (cols.length < 289) return;
+            const date = cols[0].trim(); if (!date) return;
             allDates.add(date);
-            const intervals = cols.slice(1, 289).map(v => {
-                let val = parseFloat(v);
-                return isNaN(val) ? 0 : val;
-            });
-            lparData[lpar][date] = { intervals: intervals };
+            lparData[lpar][date] = { intervals: cols.slice(1, 289).map(v => isNaN(parseFloat(v)) ? 0 : parseFloat(v)) };
         });
+    }
+
+    function calculatePercentile(arr, p) {
+        if (!arr || !arr.length) return 0;
+        const s = [...arr].sort((a, b) => a - b);
+        let i = percentileMethod === 'EXC' ? (s.length + 1) * p - 1 : (s.length - 1) * p;
+        if (i < 0) return s[0]; if (i >= s.length - 1) return s[s.length - 1];
+        const l = Math.floor(i), u = Math.ceil(i), w = i - l;
+        return s[l] * (1 - w) + s[u] * w;
     }
 
     function getLparStats(lpar, date) {
         const metric = document.getElementById('metricSelect').value;
-        
-        // CASE: CSV Data is missing for this LPAR or Date
-        if (!lparData[lpar] || !lparData[lpar][date]) {
-            return { 
-                intervals: Array(288).fill(standbyValue), 
-                [metric]: standbyValue 
-            };
-        }
-        
-        const data = lparData[lpar][date];
-        let val = 0;
-        
-        if (metric === "Max") {
-            val = Math.max(...data.intervals);
-        } else if (metric === "Avg") {
-            // Average of intervals
-            val = data.intervals.reduce((a, b) => a + b, 0) / 288;
-        } else if (metric.startsWith('p')) {
-            const p = parseInt(metric.substring(1)) / 100;
-            val = calculatePercentile(data.intervals, p);
-        }
-    
+        if (!lparData[lpar] || !lparData[lpar][date]) return { intervals: Array(288).fill(standbyValue), [metric]: standbyValue };
+        const data = lparData[lpar][date]; let val = 0;
+        if (metric === "Max") val = Math.max(...data.intervals);
+        else if (metric === "Avg") val = data.intervals.reduce((a, b) => a + b, 0) / 288;
+        else if (metric.startsWith('p')) val = calculatePercentile(data.intervals, parseInt(metric.substring(1)) / 100);
         return { ...data, [metric]: val };
     }
 
-    // --- UI Logic ---
     function updateSelectors() {
         const sortedDates = Array.from(allDates).sort((a, b) => new Date(a) - new Date(b));
         const m1 = document.getElementById('machineSelect'), m2 = document.getElementById('lparMachineSelect'), ds = document.getElementById('dateSelect');
         m1.innerHTML = m2.innerHTML = Object.keys(config).map(m => `<option value="${m}">${m}</option>`).join('');
         ds.innerHTML = sortedDates.map(d => `<option value="${d}">${d}</option>`).join('');
-        // Populate initially based on current tab
         if (currentTab === 'machine') populatePoolCheckboxes(); else populateLparList();
     }
 
@@ -277,140 +213,89 @@
         document.getElementById('machineSummary').classList.toggle('hidden', tab !== 'machine');
         document.getElementById('lparControls').classList.toggle('hidden', tab !== 'lpar');
         document.getElementById('lparSummary').classList.toggle('hidden', tab !== 'lpar');
-        
-        // FIX: Re-populate the checkbox groups to ensure they aren't empty when switching tabs
         if (tab === 'machine') populatePoolCheckboxes(); else populateLparList();
     }
 
     function populatePoolCheckboxes() {
-        const m = document.getElementById('machineSelect').value;
-        const container = document.getElementById('poolCheckboxes');
-        if (!config[m]) { container.innerHTML = ""; return; }
-        container.innerHTML = Object.keys(config[m]).map(p => `
-            <div class="checkbox-item"><input type="checkbox" checked value="${p}" onchange="updateMachineChart()"> <span>${p}</span></div>
-        `).join('');
+        const m = document.getElementById('machineSelect').value, container = document.getElementById('poolCheckboxes');
+        if (!config[m]) return;
+        const pools = Object.keys(config[m]);
+        // If no pools selected yet, select all by default
+        if (selectedPools.size === 0) {
+            pools.forEach(p => selectedPools.add(p));
+        }
+        container.innerHTML = pools.map(p => `<div class="checkbox-item"><input type="checkbox" ${selectedPools.has(p) ? 'checked' : ''} value="${p}" onchange="updatePoolSelection(this); updateMachineChart()"> <span>${p}</span></div>`).join('');
         updateMachineChart();
     }
 
+    function updatePoolSelection(checkbox) {
+        if (checkbox.checked) {
+            selectedPools.add(checkbox.value);
+        } else {
+            selectedPools.delete(checkbox.value);
+        }
+    }
+
     function populateLparList() {
-        const m = document.getElementById('lparMachineSelect').value;
-        const container = document.getElementById('lparCheckboxes');
-        if (!config[m]) { container.innerHTML = ""; return; }
-        let lpars = [];
-        for (let p in config[m]) lpars = lpars.concat(config[m][p]);
-        container.innerHTML = lpars.map(l => `
-            <div class="checkbox-item"><input type="checkbox" value="${l}" onchange="updateLparChart()"> <span>${l}</span></div>
-        `).join('');
+        const m = document.getElementById('lparMachineSelect').value, container = document.getElementById('lparCheckboxes');
+        if (!config[m]) return;
+        let lpars = []; for (let p in config[m]) lpars = lpars.concat(config[m][p]);
+        container.innerHTML = lpars.map(l => `<div class="checkbox-item"><input type="checkbox" ${selectedLpars.has(l) ? 'checked' : ''} value="${l}" onchange="updateLparSelection(this); updateLparChart()"> <span>${l}</span></div>`).join('');
         updateLparChart();
     }
 
-    // --- Calculation & Charting ---
+    function updateLparSelection(checkbox) {
+        if (checkbox.checked) {
+            selectedLpars.add(checkbox.value);
+        } else {
+            selectedLpars.delete(checkbox.value);
+        }
+    }
+
     function updateMachineChart() {
         const m = document.getElementById('machineSelect').value, met = document.getElementById('metricSelect').value;
         const pools = Array.from(document.querySelectorAll('#poolCheckboxes input:checked')).map(i => i.value);
         const dates = Array.from(allDates).sort((a, b) => new Date(a) - new Date(b));
-        const poolContainer = document.getElementById('poolBreakdown');
-        poolContainer.innerHTML = "";
-
-        if (!config[m] || dates.length === 0 || pools.length === 0) { 
-            document.getElementById('statMin').innerText = "0.00";
-            document.getElementById('statMax').innerText = "0.00";
-            if(chart) chart.destroy();
-            return; 
-        }
+        const poolContainer = document.getElementById('poolBreakdown'); poolContainer.innerHTML = "";
+        if (!config[m] || dates.length === 0 || pools.length === 0) return;
 
         const datasets = pools.map((p, idx) => {
-            const poolDailyValues = dates.map(d => {
-                return config[m][p].reduce((s, l) => s + getLparStats(l, d)[met], 0);
-            });
-            
-            const minP = Math.min(...poolDailyValues), maxP = Math.max(...poolDailyValues);
-            const minDateP = dates[poolDailyValues.indexOf(minP)], maxDateP = dates[poolDailyValues.indexOf(maxP)];
-
-            const card = document.createElement('div');
-            card.className = 'pool-card';
-            card.innerHTML = `
-                <h4>Pool: ${p}</h4>
-                <div style="display:flex; justify-content: space-between;">
-                    <span>Min: <b>${minP.toFixed(2)}</b> <br><small>${minDateP}</small></span>
-                    <span>Max: <b>${maxP.toFixed(2)}</b> <br><small>${maxDateP}</small></span>
-                </div>
-            `;
+            const daily = dates.map(d => config[m][p].reduce((s, l) => s + getLparStats(l, d)[met], 0));
+            const minV = Math.min(...daily), maxV = Math.max(...daily);
+            const minD = dates[daily.indexOf(minV)], maxD = dates[daily.indexOf(maxV)];
+            const card = document.createElement('div'); card.className = 'pool-card';
+            card.innerHTML = `<h4>Pool: ${p}</h4><div class="pool-stat-grid">
+                <div><div class="pool-sub-label">Min</div><div class="pool-sub-val">${minV.toFixed(2)}</div><div class="pool-sub-date">${minD}</div></div>
+                <div><div class="pool-sub-label">Max</div><div class="pool-sub-val">${maxV.toFixed(2)}</div><div class="pool-sub-date">${maxD}</div></div></div>`;
             poolContainer.appendChild(card);
-
-            return { label: p, backgroundColor: `hsla(${idx * 60}, 70%, 50%, 0.8)`, data: poolDailyValues };
+            return { label: p, backgroundColor: `hsla(${idx * 70}, 70%, 50%, 0.8)`, data: daily };
         });
 
-        const dailyTotals = dates.map(d => pools.reduce((s, p) => s + config[m][p].reduce((ls, l) => ls + getLparStats(l, d)[met], 0), 0));
-        const overallMin = Math.min(...dailyTotals), overallMax = Math.max(...dailyTotals);
-        
-        document.getElementById('statMin').innerText = overallMin.toFixed(2);
-        document.getElementById('statMinDate').innerText = dates[dailyTotals.indexOf(overallMin)];
-        document.getElementById('statMax').innerText = overallMax.toFixed(2);
-        document.getElementById('statMaxDate').innerText = dates[dailyTotals.indexOf(overallMax)];
-        document.getElementById('minLabel').innerText = `Machine Min (${met})`;
-        document.getElementById('maxLabel').innerText = `Machine Max (${met})`;
-
+        const machineDaily = dates.map(d => pools.reduce((s, p) => s + config[m][p].reduce((ls, l) => ls + getLparStats(l, d)[met], 0), 0));
+        const mMin = Math.min(...machineDaily), mMax = Math.max(...machineDaily);
+        document.getElementById('statMin').innerText = mMin.toFixed(2);
+        document.getElementById('statMinDate').innerText = dates[machineDaily.indexOf(mMin)];
+        document.getElementById('statMax').innerText = mMax.toFixed(2);
+        document.getElementById('statMaxDate').innerText = dates[machineDaily.indexOf(mMax)];
+        document.getElementById('minLabel').innerText = `MACHINE MIN (${met.toUpperCase()})`;
+        document.getElementById('maxLabel').innerText = `MACHINE MAX (${met.toUpperCase()})`;
         initChart(dates, datasets);
-    }
-
-    // function calculatePercentile(arr, p) {
-    //     if (!arr || !arr.length) return 0;
-    //     const s = [...arr].sort((a, b) => a - b);
-    //     const i = (s.length - 1) * p, l = Math.floor(i), u = Math.ceil(i), w = i - l;
-    //     return u >= s.length ? s[l] : s[l] * (1 - w) + s[u] * w;
-    // }
-    function calculatePercentile(arr, p) {
-        if (!arr || !arr.length) return 0;
-        const s = [...arr].sort((a, b) => a - b);
-        
-        let i;
-        if (percentileMethod === 'EXC') {
-            // EXC method: (N + 1) * p - 1 
-            i = (s.length + 1) * p - 1;
-        } else {
-            // INC method: (N - 1) * p
-            i = (s.length - 1) * p;
-        }
-
-        // Boundary protection for EXC (it can result in out-of-bounds indices)
-        if (i < 0) return s[0];
-        if (i >= s.length - 1) return s[s.length - 1];
-
-        const l = Math.floor(i), u = Math.ceil(i), w = i - l;
-        return s[l] * (1 - w) + s[u] * w;
     }
 
     function updateLparChart() {
         const d = document.getElementById('dateSelect').value, lpars = Array.from(document.querySelectorAll('#lparCheckboxes input:checked')).map(i => i.value);
-        if (!d || !lpars.length) { 
-            if (chart) chart.destroy(); 
-            ["Min","Avg","P95","P90","P80","P70","P60","P50","Max"].forEach(k => {
-                const el = document.getElementById(`lparStat${k}`);
-                if(el) el.innerText = "0.00";
-            });
-            return; 
-        }
-
+        if (!d || !lpars.length) { if (chart) chart.destroy(); return; }
         const comb = Array(288).fill(0);
         const datasets = lpars.map((l, idx) => {
-            const data = getLparStats(l, d).intervals;
-            data.forEach((v, i) => comb[i] += v);
+            const data = getLparStats(l, d).intervals; data.forEach((v, i) => comb[i] += v);
             return { label: l, data, fill: true, backgroundColor: `hsla(${idx * 45}, 70%, 50%, 0.5)`, pointRadius: 0 };
         });
-
         document.getElementById('lparStatMin').innerText = Math.min(...comb).toFixed(2);
         document.getElementById('lparStatMax').innerText = Math.max(...comb).toFixed(2);
         document.getElementById('lparStatAvg').innerText = (comb.reduce((a,b)=>a+b,0)/288).toFixed(2);
-        document.getElementById('lparStatP95').innerText = calculatePercentile(comb, 0.95).toFixed(2);
-        document.getElementById('lparStatP90').innerText = calculatePercentile(comb, 0.90).toFixed(2);
-        document.getElementById('lparStatP80').innerText = calculatePercentile(comb, 0.80).toFixed(2);
-        document.getElementById('lparStatP70').innerText = calculatePercentile(comb, 0.70).toFixed(2);
-        document.getElementById('lparStatP60').innerText = calculatePercentile(comb, 0.60).toFixed(2);
-        document.getElementById('lparStatP50').innerText = calculatePercentile(comb, 0.50).toFixed(2);
-
-        const labels = Array.from({length: 288}, (_, i) => `${Math.floor(i/12)}:${((i%12)*5).toString().padStart(2,'0')}`);
-        initChart(labels, datasets);
+        const pKeys = ["P50","P60","P70","P80","P90","P95"];
+        pKeys.forEach(p => document.getElementById(`lparStat${p}`).innerText = calculatePercentile(comb, parseInt(p.substring(1))/100).toFixed(2));
+        initChart(Array.from({length: 288}, (_, i) => `${Math.floor(i/12)}:${((i%12)*5).toString().padStart(2,'0')}`), datasets);
     }
 
     function initChart(labels, datasets) {
