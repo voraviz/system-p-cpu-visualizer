@@ -324,10 +324,19 @@
         }
         const mMin = Math.min(...machineDaily), mMax = Math.max(...machineDaily);
         document.getElementById('statMin').innerText = mMin.toFixed(2);
-        document.getElementById('statMinDate').innerText = dates[machineDaily.indexOf(mMin)];
         document.getElementById('statMax').innerText = mMax.toFixed(2);
-        document.getElementById('statMaxDate').innerText = dates[machineDaily.indexOf(mMax)];
+        
         const modeLabel = aggregationMode === 'capacity' ? 'Sum of' : 'Of Sums';
+        if (aggregationMode === 'capacity') {
+            // Capacity Planning: Date is misleading since we sum metrics from different times
+            document.getElementById('statMinDate').innerText = 'Multiple Dates';
+            document.getElementById('statMaxDate').innerText = 'Multiple Dates';
+        } else {
+            // Actual Usage: Date is meaningful since it's the actual peak moment
+            document.getElementById('statMinDate').innerText = dates[machineDaily.indexOf(mMin)];
+            document.getElementById('statMaxDate').innerText = dates[machineDaily.indexOf(mMax)];
+        }
+        
         document.getElementById('minLabel').innerText = `MACHINE MIN (${met.toUpperCase()} - ${modeLabel})`;
         document.getElementById('maxLabel').innerText = `MACHINE MAX (${met.toUpperCase()} - ${modeLabel})`;
         initChart(dates, datasets);
