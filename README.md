@@ -1,5 +1,6 @@
-# IBM System P CPU Utilization Visualizer
-- [IBM System P CPU Utilization Visualizer](#ibm-system-p-cpu-utilization-visualizer)
+# CPU Utilization Visualizer
+- [CPU Utilization Visualizer](#cpu-utilization-visualizer)
+  - [Description](#description)
   - [Project Structure](#project-structure)
   - [Features](#features)
     - [Machine Utilization View](#machine-utilization-view)
@@ -15,19 +16,25 @@
   - [Technologies Used](#technologies-used)
   - [Development](#development)
 
-A single-page web application for visualizing historical CPU utilization data from IBM System P machines. This tool helps analyze CPU usage patterns across multiple LPARs (Logical Partitions) organized by CPU Pools.
+## Description
+
+A single-page web application designed for the visualization of historical CPU utilization data. Initially conceived for IBM Power Systems (Logical Partitions), this tool can be readily adapted to accommodate other virtualization platforms as well.
+
+The application facilitates the analysis of CPU usage patterns across multiple LPARs or Virtual Machines on physical hardware, organized by CPU Pools.
 
 ## Project Structure
  
 ```
 cpu-utilization-visualizer/
-├── visualizer.html         # Main application file
-├── config.ini              # Machine and CPU Pool configuration
-├── data/                   # CSV files containing CPU utilization data
+├── visualizer.html           # Main application file
+├── config.ini                # Machine and CPU Pool configuration
+├── generate_cpu_data.py      # Create sample data for testing
+├── data/                     # Sample of CSV files containing CPU utilization data
 │   ├── lpar1.csv
 │   ├── lpar2.csv
 │   └── ...
-└── README.md               # This file
+├── DATA_GENERATOR_GUIDE.md   # Data Generator Guide
+└── README.md                 # This file
 ```
 
 ## Features
