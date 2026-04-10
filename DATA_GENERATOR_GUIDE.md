@@ -1,8 +1,21 @@
 # Data Generator
+- [Data Generator](#data-generator)
+- [CPU Utilization Data Generator](#cpu-utilization-data-generator)
+  - [🚀 Features](#-features)
+  - [📋 Prerequisites](#-prerequisites)
+  - [🛠️ Command Line Arguments](#️-command-line-arguments)
+  - [💡 Usage Examples](#-usage-examples)
+    - [1. High-Performance Database LPAR](#1-high-performance-database-lpar)
+    - [2. Standard Web Server](#2-standard-web-server)
+    - [3. Testing Standby Logic](#3-testing-standby-logic)
+  - [📊 Data Logic Details](#-data-logic-details)
+    - [Time of Day](#time-of-day)
+    - [Peak Day Multiplier](#peak-day-multiplier)
+  - [📁 Output Format](#-output-format)
 
 # CPU Utilization Data Generator
 
-A Python-based utility to generate realistic, synthetic CPU utilization data for **IBM Power Systems (LPARs)**. This tool creates CSV files compatible with the **CPU Utilization Visualizer**, simulating daily workloads, peak hour surges, and specific monthly peak-day events.
+A Python-based utility to generate synthetic CPU utilization data. This tool creates CSV files compatible with the **CPU Utilization Visualizer**, simulating daily workloads, off-peak and peak hour surges, and specific monthly peak-day events.
 
 ## 🚀 Features
 
@@ -69,7 +82,7 @@ python generate_cpu_data.py --lpar TEST_STANDBY --peak-min 0.1 --peak-max 0.2 --
 
 ## 📊 Data Logic Details
 
-### Time Zones
+### Time of Day
 * **Off-Peak**: 12:00 AM – 05:00 AM.
 * **Peak 1**: 08:00 AM – 12:00 PM (Noon).
 * **Peak 2**: 02:00 PM – 08:00 PM.
