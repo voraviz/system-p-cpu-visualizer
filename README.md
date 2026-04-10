@@ -5,6 +5,11 @@
   - [Features](#features)
     - [Machine Utilization View](#machine-utilization-view)
     - [LPAR Utilization View](#lpar-utilization-view)
+  - [Aggregation Modes](#aggregation-modes)
+    - [Capacity Planning (Sum of Metrics) - DEFAULT](#capacity-planning-sum-of-metrics---default)
+    - [Actual Usage (Metric of Sums)](#actual-usage-metric-of-sums)
+    - [Key Differences](#key-differences)
+    - [Example Scenario](#example-scenario)
   - [Screenshots](#screenshots)
     - [Machine CPU Utilization (Sum by Pool)](#machine-cpu-utilization-sum-by-pool)
     - [LPAR CPU Utilization (by Date)](#lpar-cpu-utilization-by-date)
@@ -13,6 +18,11 @@
     - [`config.ini`](#configini)
     - [CSV Performance Data](#csv-performance-data)
   - [Example Data Generation (Python)](#example-data-generation-python)
+  - [Architecture \& Data Flow](#architecture--data-flow)
+    - [High-Level Architecture](#high-level-architecture)
+    - [Detailed Data Flow](#detailed-data-flow)
+    - [Component Interaction](#component-interaction)
+    - [State Management](#state-management)
   - [Technologies Used](#technologies-used)
   - [Development](#development)
 
@@ -191,13 +201,32 @@ The Machine Utilization view offers two distinct calculation methods to serve di
 
  [Data Generator](DATA_GENERATOR_GUIDE.md)
 
+## Architecture
+
+```mermaid
+graph TB
+    A[User] -->|Upload| B[config.ini & CSV Files]
+    B -->|Parse| C[Data Store]
+    C --> D[Processing Layer]
+    D -->|Machine View| E[Stacked Bar Chart]
+    D -->|LPAR View| F[Stacked Line Chart]
+    E --> G[Chart.js]
+    F --> G
+    G --> H[Interactive Visualization]
+    
+    style A fill:#e1f5ff
+    style C fill:#fff4e1
+    style H fill:#e8f5e9
+```
+
 ## Technologies Used
 
 -   **HTML5:** Structure of the web page.
--   **CSS3:** Styling.
+-   **CSS3:** Styling and responsive layout.
 -   **JavaScript (ES6+):** Core logic for data parsing, calculations, and UI interaction.
--   **Chart.js:** For rendering interactive charts. Loaded via CDN
+-   **Chart.js:** For rendering interactive charts. Loaded via CDN.
+-   **Mermaid:** Documentation diagrams (in README).
 
 ## Development
 
-The project is designed to be self-contained within `visualizer.html`, making it easy to deploy and use locally.
+The project is designed to be self-contained within `visualizer.html`, making it easy to deploy and use locally. All processing happens client-side in the browser with no server dependencies.
