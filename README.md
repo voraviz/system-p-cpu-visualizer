@@ -169,13 +169,17 @@ The Machine Utilization view offers two distinct calculation methods to serve di
 
 -   Sections `[Machine Name]` define machines.
 -   Under each machine, `CPU POOL NAME=LPAR1,LPAR2,...` defines pools and their member LPARs.
--   The `[MAIN]` section can define `PERCENTILE` (INC/EXC) and `STANDBY` (numeric value for LPARs without CSV data).
+-   The `[MAIN]` section can define:
+    -   `PERCENTILE` (INC/EXC) - Percentile calculation method
+    -   `STANDBY` (numeric) - Default CPU cores for LPARs without CSV data
+    -   `INTERVAL` (numeric) - Time interval in minutes (default: 5)
 -   Lines starting with # are comments and will be ignored
     *   **Example `config.ini` structure:**
         ```ini
         [MAIN]
         PERCENTILE=INC  ; or EXC
         STANDBY=0.1     ; default value for standby LPARs if no CSV data
+        INTERVAL=5      ; time interval in minutes (5, 10, 15, 30, etc.)
         [MACHINE1]
         POOL1=LPAR1,LPAR3,LPAR5
         POOL2=LPAR7,LPAR9
@@ -189,14 +193,24 @@ The Machine Utilization view offers two distinct calculation methods to serve di
 -   **Filename:** `lparname.csv` (e.g., `lpar1.csv`).
 -   **Content:**
     -   First column: Date in `mm/dd/yyyy` format (e.g., 04/30/2026)
-    -   Next 288 columns: CPU utilization in cores for 5-minute intervals (representing 24 hours).
-    *   **Example `config.ini` structure:**
+    -   Remaining columns: CPU utilization in cores for each time interval
+    -   Number of columns depends on `INTERVAL` setting in config.ini:
+        -   5 minutes → 288 columns (default)
+        -   10 minutes → 144 columns
+        -   15 minutes → 96 columns
+        -   30 minutes → 48 columns
+    *   **Example CSV structure (5-minute intervals):**
     ```csv
     Date,00:00,00:05,00:10,...,23:50,23:55
     04/01/2026,2.5,2.8,3.1,...,2.2,2.0
     04/02/2026,3.2,3.5,3.8,...,3.0,2.8
     ```
-    <!-- -   (Note: The last 3 columns mentioned in `requirements.md` for max, p90, p95 are currently ignored by the visualizer, as it calculates these dynamically from the 288 intervals.) -->
+    *   **Example CSV structure (15-minute intervals):**
+    ```csv
+    Date,00:00,00:15,00:30,...,23:30,23:45
+    04/01/2026,2.5,2.8,3.1,...,2.2,2.0
+    04/02/2026,3.2,3.5,3.8,...,3.0,2.8
+    ```
 ## Example Data Generation (Python)
 
  [Data Generator](DATA_GENERATOR_GUIDE.md)

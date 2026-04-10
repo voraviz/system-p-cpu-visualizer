@@ -142,7 +142,7 @@
 </div>
 
 <script>
-    let config = {}, lparData = {}, percentileMethod = 'INC', standbyValue = 0.1, allDates = new Set(), currentTab = 'machine', chart = null, selectedLpars = new Set(), selectedPools = new Set(), aggregationMode = 'capacity';
+    let config = {}, lparData = {}, percentileMethod = 'INC', standbyValue = 0.1, intervalMinutes = 5, intervalsPerDay = 288, allDates = new Set(), currentTab = 'machine', chart = null, selectedLpars = new Set(), selectedPools = new Set(), aggregationMode = 'capacity';
 
     document.getElementById('iniUpload').addEventListener('change', async (e) => {
         const text = await e.target.files[0].text(), lines = text.split(/\r?\n/);
@@ -155,8 +155,13 @@
             } else if (line.includes('=') && currentSection) {
                 const [key, val] = line.split('=');
                 if (currentSection === 'MAIN') {
-                    if (key.trim().toUpperCase() === 'PERCENTILE') percentileMethod = val.trim().toUpperCase();
-                    if (key.trim().toUpperCase() === 'STANDBY') standbyValue = parseFloat(val.trim()) || 0.1;
+                    const k = key.trim().toUpperCase();
+                    if (k === 'PERCENTILE') percentileMethod = val.trim().toUpperCase();
+                    if (k === 'STANDBY') standbyValue = parseFloat(val.trim()) || 0.1;
+                    if (k === 'INTERVAL') {
+                        intervalMinutes = parseInt(val.trim()) || 5;
+                        intervalsPerDay = (24 * 60) / intervalMinutes;
+                    }
                 } else config[currentSection][key.trim()] = val.trim().split(',').map(s => s.trim());
             }
         });
@@ -174,11 +179,12 @@
 
     function parseCSV(lpar, text) {
         const rows = text.split(/\r?\n/); lparData[lpar] = {};
+        const expectedCols = intervalsPerDay + 1; // date + intervals
         rows.slice(1).forEach(row => {
-            const cols = row.split(','); if (cols.length < 289) return;
+            const cols = row.split(','); if (cols.length < expectedCols) return;
             const date = cols[0].trim(); if (!date) return;
             allDates.add(date);
-            lparData[lpar][date] = { intervals: cols.slice(1, 289).map(v => isNaN(parseFloat(v)) ? 0 : parseFloat(v)) };
+            lparData[lpar][date] = { intervals: cols.slice(1, expectedCols).map(v => isNaN(parseFloat(v)) ? 0 : parseFloat(v)) };
         });
     }
 
@@ -193,10 +199,10 @@
 
     function getLparStats(lpar, date) {
         const metric = document.getElementById('metricSelect').value;
-        if (!lparData[lpar] || !lparData[lpar][date]) return { intervals: Array(288).fill(standbyValue), [metric]: standbyValue };
+        if (!lparData[lpar] || !lparData[lpar][date]) return { intervals: Array(intervalsPerDay).fill(standbyValue), [metric]: standbyValue };
         const data = lparData[lpar][date]; let val = 0;
         if (metric === "Max") val = Math.max(...data.intervals);
-        else if (metric === "Avg") val = data.intervals.reduce((a, b) => a + b, 0) / 288;
+        else if (metric === "Avg") val = data.intervals.reduce((a, b) => a + b, 0) / intervalsPerDay;
         else if (metric.startsWith('p')) val = calculatePercentile(data.intervals, parseInt(metric.substring(1)) / 100);
         return { ...data, [metric]: val };
     }
@@ -275,13 +281,13 @@
             } else {
                 // Actual Usage: Metric of combined intervals
                 daily = dates.map(d => {
-                    const combined = Array(288).fill(0);
+                    const combined = Array(intervalsPerDay).fill(0);
                     config[m][p].forEach(l => {
                         const intervals = getLparStats(l, d).intervals;
                         intervals.forEach((v, i) => combined[i] += v);
                     });
                     if (met === "Max") return Math.max(...combined);
-                    else if (met === "Avg") return combined.reduce((a, b) => a + b, 0) / 288;
+                    else if (met === "Avg") return combined.reduce((a, b) => a + b, 0) / intervalsPerDay;
                     else if (met.startsWith('p')) return calculatePercentile(combined, parseInt(met.substring(1)) / 100);
                     return 0;
                 });
@@ -303,7 +309,7 @@
         } else {
             // Actual Usage: Combine all LPARs across all pools, then calculate metric
             machineDaily = dates.map(d => {
-                const combined = Array(288).fill(0);
+                const combined = Array(intervalsPerDay).fill(0);
                 pools.forEach(p => {
                     config[m][p].forEach(l => {
                         const intervals = getLparStats(l, d).intervals;
@@ -311,7 +317,7 @@
                     });
                 });
                 if (met === "Max") return Math.max(...combined);
-                else if (met === "Avg") return combined.reduce((a, b) => a + b, 0) / 288;
+                else if (met === "Avg") return combined.reduce((a, b) => a + b, 0) / intervalsPerDay;
                 else if (met.startsWith('p')) return calculatePercentile(combined, parseInt(met.substring(1)) / 100);
                 return 0;
             });
@@ -330,17 +336,18 @@
     function updateLparChart() {
         const d = document.getElementById('dateSelect').value, lpars = Array.from(document.querySelectorAll('#lparCheckboxes input:checked')).map(i => i.value);
         if (!d || !lpars.length) { if (chart) chart.destroy(); return; }
-        const comb = Array(288).fill(0);
+        const comb = Array(intervalsPerDay).fill(0);
         const datasets = lpars.map((l, idx) => {
             const data = getLparStats(l, d).intervals; data.forEach((v, i) => comb[i] += v);
             return { label: l, data, fill: true, backgroundColor: `hsla(${idx * 45}, 70%, 50%, 0.5)`, pointRadius: 0 };
         });
         document.getElementById('lparStatMin').innerText = Math.min(...comb).toFixed(2);
         document.getElementById('lparStatMax').innerText = Math.max(...comb).toFixed(2);
-        document.getElementById('lparStatAvg').innerText = (comb.reduce((a,b)=>a+b,0)/288).toFixed(2);
+        document.getElementById('lparStatAvg').innerText = (comb.reduce((a,b)=>a+b,0)/intervalsPerDay).toFixed(2);
         const pKeys = ["P50","P60","P70","P80","P90","P95"];
         pKeys.forEach(p => document.getElementById(`lparStat${p}`).innerText = calculatePercentile(comb, parseInt(p.substring(1))/100).toFixed(2));
-        initChart(Array.from({length: 288}, (_, i) => `${Math.floor(i/12)}:${((i%12)*5).toString().padStart(2,'0')}`), datasets);
+        const intervalsPerHour = 60 / intervalMinutes;
+        initChart(Array.from({length: intervalsPerDay}, (_, i) => `${Math.floor(i/intervalsPerHour)}:${((i%intervalsPerHour)*intervalMinutes).toString().padStart(2,'0')}`), datasets);
     }
 
     function initChart(labels, datasets) {
