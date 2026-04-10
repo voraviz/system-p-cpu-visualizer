@@ -244,6 +244,10 @@
         const m = document.getElementById('lparMachineSelect').value, container = document.getElementById('lparCheckboxes');
         if (!config[m]) return;
         let lpars = []; for (let p in config[m]) lpars = lpars.concat(config[m][p]);
+        // If no LPARs selected yet, select all by default
+        if (selectedLpars.size === 0) {
+            lpars.forEach(l => selectedLpars.add(l));
+        }
         container.innerHTML = lpars.map(l => `<div class="checkbox-item"><input type="checkbox" ${selectedLpars.has(l) ? 'checked' : ''} value="${l}" onchange="updateLparSelection(this); updateLparChart()"> <span>${l}</span></div>`).join('');
         updateLparChart();
     }
