@@ -13,16 +13,13 @@
   - [Screenshots](#screenshots)
     - [Machine CPU Utilization (Sum by Pool)](#machine-cpu-utilization-sum-by-pool)
     - [LPAR CPU Utilization (by Date)](#lpar-cpu-utilization-by-date)
+    - [Capacity Exceed Percentile Planning](#capacity-exceed-percentile-planning)
   - [How to Use](#how-to-use)
   - [Data Formats](#data-formats)
     - [`config.ini`](#configini)
     - [CSV Performance Data](#csv-performance-data)
   - [Example Data Generation (Python)](#example-data-generation-python)
-  - [Architecture \& Data Flow](#architecture--data-flow)
-    - [High-Level Architecture](#high-level-architecture)
-    - [Detailed Data Flow](#detailed-data-flow)
-    - [Component Interaction](#component-interaction)
-    - [State Management](#state-management)
+  - [Architecture](#architecture)
   - [Technologies Used](#technologies-used)
   - [Development](#development)
 
@@ -157,6 +154,10 @@ The Machine Utilization view offers two distinct calculation methods to serve di
 ### LPAR CPU Utilization (by Date)
 
 ![](images/lpar.png)
+
+### Capacity Exceed Percentile Planning
+
+![](images/exceed-percentile-planning.png)
 
 ## How to Use
 
