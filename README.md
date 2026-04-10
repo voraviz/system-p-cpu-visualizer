@@ -48,6 +48,7 @@ cpu-utilization-visualizer/
 
 -   **Stacked Bar Chart:** Visualizes daily CPU utilization for a selected machine, stacked by CPU pool.
 -   **Metric Selection:** Choose between Max, Average, or various Percentiles (P50, P60, P70, P80, P90, P95) for daily aggregation.
+-   **Aggregation Mode:** Select between two calculation methods (see [Aggregation Modes](#aggregation-modes) below).
 -   **Pool Toggling:** Dynamically show/hide individual CPU pools on the chart.
 -   **Summary Dashboard:** Displays the minimum and maximum total daily CPU cores across the entire period for the selected machine and metric, along with per-pool min/max statistics.
 
@@ -56,6 +57,81 @@ cpu-utilization-visualizer/
 -   **Stacked Line Chart:** Shows intra-day CPU utilization (5-minute intervals) for selected LPARs on a specific date.
 -   **Combined View:** Aggregates and displays the utilization of multiple selected LPARs.
 -   **Summary Dashboard:** Provides detailed statistics for the selected LPARs' combined utilization, including Min, Max, Average, P50, P60, P70, P80, P90, and P95.
+
+## Aggregation Modes
+
+The Machine Utilization view offers two distinct calculation methods to serve different analysis purposes:
+
+### Capacity Planning (Sum of Metrics) - DEFAULT
+
+**How it works:**
+1. Calculate the selected metric (Max, P95, etc.) for each LPAR individually across all 288 intervals
+2. Sum these metrics across all LPARs in each pool
+3. Display the total as the pool's value for that day
+
+**Example:**
+- LPAR1 peaks at 20 cores (at 10:00 AM)
+- LPAR2 peaks at 25 cores (at 3:00 PM)
+- **Result: 45 cores**
+
+**Use Cases:**
+- ✅ **Hardware Sizing:** "What capacity do I need if each workload hits its typical high usage?"
+- ✅ **Budget Planning:** Conservative estimates for infrastructure investment
+- ✅ **Capacity Planning:** Accounts for each workload's independent peak patterns
+- ✅ **Risk Mitigation:** Ensures headroom for when multiple workloads are busy
+
+**When to use:** Planning new hardware purchases, justifying capacity requirements, or ensuring adequate resources for independent workload peaks.
+
+### Actual Usage (Metric of Sums)
+
+**How it works:**
+1. Combine all LPAR values at each 5-minute interval (288 intervals per day)
+2. Calculate the selected metric from these combined intervals
+3. Display the actual peak/percentile of the combined usage
+
+**Example:**
+- LPAR1 peaks at 20 cores (at 10:00 AM)
+- LPAR2 peaks at 25 cores (at 3:00 PM)
+- At 10:00 AM: LPAR1=20, LPAR2=15 → Combined=35
+- At 3:00 PM: LPAR1=10, LPAR2=25 → Combined=35
+- **Result: 35 cores** (actual maximum at any single moment)
+
+**Use Cases:**
+- ✅ **Utilization Analysis:** "What's the real peak usage across all workloads?"
+- ✅ **Waste Identification:** Compare actual usage vs. provisioned capacity
+- ✅ **Performance Troubleshooting:** Identify true bottleneck moments
+- ✅ **Consolidation Planning:** Understand actual combined resource consumption
+
+**When to use:** Analyzing current utilization, identifying over-provisioning, or understanding real-world resource consumption patterns.
+
+### Key Differences
+
+| Aspect | Capacity Planning | Actual Usage |
+|--------|------------------|--------------|
+| **Calculation** | Sum of individual metrics | Metric of combined sums |
+| **Peak Timing** | Peaks can occur at different times | Peak is at a single moment |
+| **Value** | Usually higher | Usually lower (more accurate) |
+| **Purpose** | Planning & sizing | Analysis & optimization |
+| **Risk** | Conservative (safer) | Realistic (actual) |
+
+### Example Scenario
+
+**Scenario:** You have 3 LPARs on a machine:
+- **Payroll LPAR:** Peaks every Friday at 5 PM (P95 = 8 cores)
+- **Web Server LPAR:** Peaks Monday mornings (P95 = 6 cores)
+- **Database LPAR:** Peaks during month-end (P95 = 10 cores)
+
+**Capacity Planning Mode (P95):**
+- Result: 8 + 6 + 10 = **24 cores**
+- Interpretation: "I need 24 cores to handle each workload's typical high usage"
+- Best for: Sizing a new machine to ensure all workloads have adequate resources
+
+**Actual Usage Mode (P95):**
+- Result: **18 cores** (95% of the time, combined usage is below this)
+- Interpretation: "These workloads rarely peak together, so 18 cores handles 95% of situations"
+- Best for: Understanding current utilization and identifying over-provisioning
+
+**Important Note:** The values in Machine Utilization (Actual Usage mode) will match the LPAR Utilization view when all LPARs are selected for the same date, as both calculate the metric from combined intervals.
 
 ## Screenshots
 

@@ -119,11 +119,15 @@
     </div>
 
     <div id="machineControls" class="controls">
-        <div><label>Select Machine</label><select id="machineSelect" onchange="populatePoolCheckboxes()"></select></div>
+        <div><label>Select Machine</label><select id="machineSelect" onchange="selectedPools.clear(); populatePoolCheckboxes()"></select></div>
         <div><label>Metric Selection</label><select id="metricSelect" onchange="updateMachineChart()">
             <option value="Max">Max</option><option value="p95">P95</option><option value="p90">P90</option>
             <option value="p80">P80</option><option value="p70">P70</option><option value="p60">P60</option>
             <option value="p50">P50</option><option value="Avg">Average</option>
+        </select></div>
+        <div><label>Aggregation Mode</label><select id="aggregationModeSelect" onchange="aggregationMode = this.value; updateMachineChart()" title="Capacity Planning: Sum each LPAR's metric (for sizing). Actual Usage: Calculate metric from combined intervals (real peak).">
+            <option value="capacity">Capacity Planning (Sum of Metrics)</option>
+            <option value="actual">Actual Usage (Metric of Sums)</option>
         </select></div>
         <div style="grid-column: span 2;"><label>CPU Pools (Toggle Display)</label><div id="poolCheckboxes" class="checkbox-group"></div></div>
     </div>
@@ -138,7 +142,7 @@
 </div>
 
 <script>
-    let config = {}, lparData = {}, percentileMethod = 'INC', standbyValue = 0.1, allDates = new Set(), currentTab = 'machine', chart = null, selectedLpars = new Set(), selectedPools = new Set();
+    let config = {}, lparData = {}, percentileMethod = 'INC', standbyValue = 0.1, allDates = new Set(), currentTab = 'machine', chart = null, selectedLpars = new Set(), selectedPools = new Set(), aggregationMode = 'capacity';
 
     document.getElementById('iniUpload').addEventListener('change', async (e) => {
         const text = await e.target.files[0].text(), lines = text.split(/\r?\n/);
@@ -260,7 +264,24 @@
         if (!config[m] || dates.length === 0 || pools.length === 0) return;
 
         const datasets = pools.map((p, idx) => {
-            const daily = dates.map(d => config[m][p].reduce((s, l) => s + getLparStats(l, d)[met], 0));
+            let daily;
+            if (aggregationMode === 'capacity') {
+                // Capacity Planning: Sum of individual LPAR metrics
+                daily = dates.map(d => config[m][p].reduce((s, l) => s + getLparStats(l, d)[met], 0));
+            } else {
+                // Actual Usage: Metric of combined intervals
+                daily = dates.map(d => {
+                    const combined = Array(288).fill(0);
+                    config[m][p].forEach(l => {
+                        const intervals = getLparStats(l, d).intervals;
+                        intervals.forEach((v, i) => combined[i] += v);
+                    });
+                    if (met === "Max") return Math.max(...combined);
+                    else if (met === "Avg") return combined.reduce((a, b) => a + b, 0) / 288;
+                    else if (met.startsWith('p')) return calculatePercentile(combined, parseInt(met.substring(1)) / 100);
+                    return 0;
+                });
+            }
             const minV = Math.min(...daily), maxV = Math.max(...daily);
             const minD = dates[daily.indexOf(minV)], maxD = dates[daily.indexOf(maxV)];
             const card = document.createElement('div'); card.className = 'pool-card';
@@ -271,14 +292,34 @@
             return { label: p, backgroundColor: `hsla(${idx * 70}, 70%, 50%, 0.8)`, data: daily };
         });
 
-        const machineDaily = dates.map(d => pools.reduce((s, p) => s + config[m][p].reduce((ls, l) => ls + getLparStats(l, d)[met], 0), 0));
+        let machineDaily;
+        if (aggregationMode === 'capacity') {
+            // Sum pool values for each date
+            machineDaily = dates.map(d => pools.reduce((s, p) => s + datasets[pools.indexOf(p)].data[dates.indexOf(d)], 0));
+        } else {
+            // Actual Usage: Combine all LPARs across all pools, then calculate metric
+            machineDaily = dates.map(d => {
+                const combined = Array(288).fill(0);
+                pools.forEach(p => {
+                    config[m][p].forEach(l => {
+                        const intervals = getLparStats(l, d).intervals;
+                        intervals.forEach((v, i) => combined[i] += v);
+                    });
+                });
+                if (met === "Max") return Math.max(...combined);
+                else if (met === "Avg") return combined.reduce((a, b) => a + b, 0) / 288;
+                else if (met.startsWith('p')) return calculatePercentile(combined, parseInt(met.substring(1)) / 100);
+                return 0;
+            });
+        }
         const mMin = Math.min(...machineDaily), mMax = Math.max(...machineDaily);
         document.getElementById('statMin').innerText = mMin.toFixed(2);
         document.getElementById('statMinDate').innerText = dates[machineDaily.indexOf(mMin)];
         document.getElementById('statMax').innerText = mMax.toFixed(2);
         document.getElementById('statMaxDate').innerText = dates[machineDaily.indexOf(mMax)];
-        document.getElementById('minLabel').innerText = `MACHINE MIN (${met.toUpperCase()})`;
-        document.getElementById('maxLabel').innerText = `MACHINE MAX (${met.toUpperCase()})`;
+        const modeLabel = aggregationMode === 'capacity' ? 'Sum of' : 'Of Sums';
+        document.getElementById('minLabel').innerText = `MACHINE MIN (${met.toUpperCase()} - ${modeLabel})`;
+        document.getElementById('maxLabel').innerText = `MACHINE MAX (${met.toUpperCase()} - ${modeLabel})`;
         initChart(dates, datasets);
     }
 
