@@ -54,6 +54,8 @@ pip install pandas numpy
 | `--offpeak-max` | Float | `2.0` | Maximum CPU cores during off-peak (00:00-05:00). |
 | `--peak-days` | String | `1,15,30` | Comma-separated list of days of the month. |
 | `--peak-day-multiplier` | Float | `1.55` | Factor to increase load on peak days (1.55 = +55%). |
+| `--interval` | Integer | `5` | Time interval in minutes (5, 10, 15, 30, etc.). |
+| `--volatility` | Float | `0.20` | Daily baseline shift (0.2 = 20% variation). |
 | `--output-dir` | String | `data` | Directory where CSV files will be saved. |
 
 ---
@@ -76,6 +78,18 @@ python generate_cpu_data.py --lpar WEB_SRV --peak-min 2.0 --peak-max 5.0 --peak-
 Generate a very low-usage LPAR to test the "Standby" visualization in the dashboard.
 ```bash
 python generate_cpu_data.py --lpar TEST_STANDBY --peak-min 0.1 --peak-max 0.2 --offpeak-min 0.05 --offpeak-max 0.1
+```
+
+### 4. Generate Data with 15-Minute Intervals
+Generate data with 15-minute intervals instead of the default 5-minute intervals (96 intervals per day).
+```bash
+python generate_cpu_data.py --lpar LPAR_15MIN --interval 15 --peak-min 4.0 --peak-max 12.0
+```
+
+### 5. Generate Data with 30-Minute Intervals
+Generate data with 30-minute intervals for systems with less frequent monitoring (48 intervals per day).
+```bash
+python generate_cpu_data.py --lpar LPAR_30MIN --interval 30 --peak-min 6.0 --peak-max 15.0
 ```
 
 ---
