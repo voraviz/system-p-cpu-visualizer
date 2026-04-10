@@ -1,6 +1,7 @@
 # CPU Utilization Visualizer
 - [CPU Utilization Visualizer](#cpu-utilization-visualizer)
   - [Description](#description)
+  - [Development](#development)
   - [Project Structure](#project-structure)
   - [Features](#features)
     - [Machine Utilization View](#machine-utilization-view)
@@ -10,6 +11,8 @@
     - [Actual Usage (Metric of Sums)](#actual-usage-metric-of-sums)
     - [Key Differences](#key-differences)
     - [Example Scenario](#example-scenario)
+    - [Configuration Example](#configuration-example)
+    - [References](#references)
   - [Screenshots](#screenshots)
     - [Machine CPU Utilization (Sum by Pool)](#machine-cpu-utilization-sum-by-pool)
     - [LPAR CPU Utilization (by Date)](#lpar-cpu-utilization-by-date)
@@ -21,13 +24,24 @@
   - [Example Data Generation (Python)](#example-data-generation-python)
   - [Architecture](#architecture)
   - [Technologies Used](#technologies-used)
-  - [Development](#development)
+  - [Percentile Calculation Methods](#percentile-calculation-methods)
+    - [Overview](#overview)
+    - [PERCENTILE.INC (Inclusive Method)](#percentileinc-inclusive-method)
+    - [PERCENTILE.EXC (Exclusive Method)](#percentileexc-exclusive-method)
+    - [Comparison Table](#comparison-table)
+    - [Which Method to Choose?](#which-method-to-choose)
+    - [Practical Example with CPU Data](#practical-example-with-cpu-data)
+
 
 ## Description
 
 A single-page web application designed for the visualization of historical CPU utilization data. Initially conceived for IBM Power Systems (Logical Partitions), this tool can be readily adapted to accommodate other virtualization platforms as well.
 
 The application facilitates the analysis of CPU usage patterns across multiple LPARs or Virtual Machines on physical hardware, organized by CPU Pools.
+
+## Development
+
+The project is designed to be self-contained within `visualizer.html`, making it easy to deploy and use locally. All processing happens client-side in the browser with no server dependencies.
 
 ## Project Structure
  
@@ -144,150 +158,6 @@ The Machine Utilization view offers two distinct calculation methods to serve di
 - Best for: Understanding current utilization and identifying over-provisioning
 
 **Important Note:** The values in Machine Utilization (Actual Usage mode) will match the LPAR Utilization view when all LPARs are selected for the same date, as both calculate the metric from combined intervals.
-
-## Percentile Calculation Methods
-
-This application supports two standard percentile calculation methods, configurable via the `PERCENTILE` setting in [`config.ini`](#configini). Understanding these methods is crucial for accurate capacity planning and performance analysis.
-
-### Overview
-
-A **percentile** is a statistical measure indicating the value below which a given percentage of observations fall. For example, the 95th percentile (P95) is the value below which 95% of the data points lie.
-
-Both methods are widely used in spreadsheet applications and statistical analysis:
-- **PERCENTILE.INC** (Inclusive) - Excel, Google Sheets `PERCENTILE` or `PERCENTILE.INC`
-- **PERCENTILE.EXC** (Exclusive) - Excel `PERCENTILE.EXC`, Google Sheets `PERCENTILE.EXC`
-
-### PERCENTILE.INC (Inclusive Method)
-
-**Configuration:** Set `PERCENTILE=INC` in `config.ini`
-
-**How it works:**
-1. Sort the data in ascending order
-2. Calculate position: `k = p × (n - 1) + 1` where:
-   - `p` = percentile (e.g., 0.95 for P95)
-   - `n` = number of data points
-   - `k` = position in sorted array
-3. If `k` is a whole number, return the value at position `k`
-4. If `k` is fractional, interpolate between the two nearest values
-
-**Example:** Finding P95 of [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
-- n = 10 data points
-- k = 0.95 × (10 - 1) + 1 = 9.55
-- Interpolate between position 9 (90) and position 10 (100)
-- Result: 90 + 0.55 × (100 - 90) = **95.5**
-
-**Characteristics:**
-- ✅ Includes both minimum and maximum values in the range
-- ✅ Can return the actual minimum (P0) and maximum (P100) values
-- ✅ More commonly used in industry and spreadsheet applications
-- ✅ Default method in Google Sheets `PERCENTILE()` function
-- ✅ Equivalent to Excel's `PERCENTILE()` and `PERCENTILE.INC()`
-
-**Excel/Google Sheets equivalent:**
-```excel
-=PERCENTILE(A1:A10, 0.95)
-=PERCENTILE.INC(A1:A10, 0.95)
-```
-
-### PERCENTILE.EXC (Exclusive Method)
-
-**Configuration:** Set `PERCENTILE=EXC` in `config.ini`
-
-**How it works:**
-1. Sort the data in ascending order
-2. Calculate position: `k = p × (n + 1)` where:
-   - `p` = percentile (e.g., 0.95 for P95)
-   - `n` = number of data points
-   - `k` = position in sorted array
-3. If `k` is a whole number, return the value at position `k`
-4. If `k` is fractional, interpolate between the two nearest values
-5. If `k < 1` or `k > n`, the percentile is undefined
-
-**Example:** Finding P95 of [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
-- n = 10 data points
-- k = 0.95 × (10 + 1) = 10.45
-- Position exceeds array bounds (k > n)
-- Result: **Undefined** (or returns maximum value as fallback)
-
-**Characteristics:**
-- ⚠️ Excludes the actual minimum and maximum from the percentile range
-- ⚠️ Cannot calculate P0 or P100 (undefined)
-- ⚠️ Requires more data points for extreme percentiles
-- ✅ Preferred in some statistical contexts for theoretical rigor
-- ✅ Equivalent to Excel's `PERCENTILE.EXC()`
-
-**Excel/Google Sheets equivalent:**
-```excel
-=PERCENTILE.EXC(A1:A10, 0.95)
-```
-
-### Statistical Theory
-
-**Linear Interpolation:**
-Both methods use linear interpolation when the calculated position falls between two data points:
-
-```
-value = data[floor(k)] + (k - floor(k)) × (data[ceil(k)] - data[floor(k)])
-```
-
-**Quantile Function:**
-Percentiles are specific quantiles of a probability distribution. The kth percentile is the value x such that:
-
-```
-P(X ≤ x) = k/100
-```
-
-Where X is a random variable representing the data distribution.
-
-**Sample vs. Population:**
-- **INC method** treats data as a complete population (includes endpoints)
-- **EXC method** treats data as a sample from a larger population (excludes endpoints)
-
-### Comparison Table
-
-| Aspect | PERCENTILE.INC | PERCENTILE.EXC |
-|--------|----------------|----------------|
-| **Formula** | k = p × (n - 1) + 1 | k = p × (n + 1) |
-| **Range** | P0 to P100 | P(1/(n+1)) to P(n/(n+1)) |
-| **Min/Max** | Can return actual min/max | Cannot return actual min/max |
-| **Excel Function** | `PERCENTILE.INC()` | `PERCENTILE.EXC()` |
-| **Google Sheets** | `PERCENTILE()` or `PERCENTILE.INC()` | `PERCENTILE.EXC()` |
-| **Default in App** | ✅ Recommended | Alternative |
-| **Use Case** | General capacity planning | Statistical analysis |
-
-### Which Method to Choose?
-
-**Use PERCENTILE.INC (Recommended) when:**
-- ✅ You need consistency with common spreadsheet tools (Excel, Google Sheets default)
-- ✅ You want to include actual observed minimum and maximum values
-- ✅ You're performing capacity planning or infrastructure sizing
-- ✅ You need to compare results with existing reports using standard percentile functions
-
-**Use PERCENTILE.EXC when:**
-- ✅ You require strict statistical methodology
-- ✅ You're working with sample data representing a larger population
-- ✅ You need to match specific statistical software or academic requirements
-- ✅ You have a large dataset (n > 100) where the difference is minimal
-
-### Practical Example with CPU Data
-
-Given 288 CPU utilization measurements (5-minute intervals over 24 hours):
-
-**Scenario:** Daily CPU cores = [2.1, 2.3, 2.5, ..., 15.8, ..., 3.2, 2.8]
-
-**PERCENTILE.INC (P95):**
-- Position: 0.95 × (288 - 1) + 1 = 273.65
-- Interpolate between values at positions 273 and 274
-- Result: **~14.2 cores**
-- Interpretation: "95% of the time, CPU usage is at or below 14.2 cores"
-
-**PERCENTILE.EXC (P95):**
-- Position: 0.95 × (288 + 1) = 274.55
-- Interpolate between values at positions 274 and 275
-- Result: **~14.3 cores**
-- Interpretation: "95% of intervals fall below 14.3 cores (excluding extremes)"
-
-**Difference:** With 288 data points, the difference is typically small (< 1%), but INC is more conservative for capacity planning.
 
 ### Configuration Example
 
@@ -407,6 +277,146 @@ graph TB
 -   **Chart.js:** For rendering interactive charts. Loaded via CDN.
 -   **Mermaid:** Documentation diagrams (in README).
 
-## Development
+## Percentile Calculation Methods
 
-The project is designed to be self-contained within `visualizer.html`, making it easy to deploy and use locally. All processing happens client-side in the browser with no server dependencies.
+This application supports two standard percentile calculation methods, configurable via the `PERCENTILE` setting in [`config.ini`](#configini). Understanding these methods is crucial for accurate capacity planning and performance analysis.
+
+### Overview
+
+A **percentile** is a statistical measure indicating the value below which a given percentage of observations fall. For example, the 95th percentile (P95) is the value below which 95% of the data points lie.
+
+Both methods are widely used in spreadsheet applications and statistical analysis:
+- **PERCENTILE.INC** (Inclusive) - Excel, Google Sheets `PERCENTILE` or `PERCENTILE.INC`
+- **PERCENTILE.EXC** (Exclusive) - Excel `PERCENTILE.EXC`, Google Sheets `PERCENTILE.EXC`
+
+### PERCENTILE.INC (Inclusive Method)
+
+**Configuration:** Set `PERCENTILE=INC` in `config.ini`
+
+**How it works:**
+1. Sort the data in ascending order
+2. Calculate position: `k = p × (n - 1) + 1` where:
+   - `p` = percentile (e.g., 0.95 for P95)
+   - `n` = number of data points
+   - `k` = position in sorted array
+3. If `k` is a whole number, return the value at position `k`
+4. If `k` is fractional, interpolate between the two nearest values
+
+**Example:** Finding P95 of [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
+- n = 10 data points
+- k = 0.95 × (10 - 1) + 1 = 9.55
+- Interpolate between position 9 (90) and position 10 (100)
+- Result: 90 + 0.55 × (100 - 90) = **95.5**
+
+**Characteristics:**
+- ✅ Includes both minimum and maximum values in the range
+- ✅ Can return the actual minimum (P0) and maximum (P100) values
+- ✅ More commonly used in industry and spreadsheet applications
+- ✅ Default method in Google Sheets `PERCENTILE()` function
+- ✅ Equivalent to Excel's `PERCENTILE()` and `PERCENTILE.INC()`
+
+**Excel/Google Sheets equivalent:**
+```excel
+=PERCENTILE(A1:A10, 0.95)
+=PERCENTILE.INC(A1:A10, 0.95)
+```
+
+### PERCENTILE.EXC (Exclusive Method)
+
+**Configuration:** Set `PERCENTILE=EXC` in `config.ini`
+
+**How it works:**
+1. Sort the data in ascending order
+2. Calculate position: `k = p × (n + 1)` where:
+   - `p` = percentile (e.g., 0.95 for P95)
+   - `n` = number of data points
+   - `k` = position in sorted array
+3. If `k` is a whole number, return the value at position `k`
+4. If `k` is fractional, interpolate between the two nearest values
+5. If `k < 1` or `k > n`, the percentile is undefined
+
+**Example:** Finding P95 of [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
+- n = 10 data points
+- k = 0.95 × (10 + 1) = 10.45
+- Position exceeds array bounds (k > n)
+- Result: **Undefined** (or returns maximum value as fallback)
+
+**Characteristics:**
+- ⚠️ Excludes the actual minimum and maximum from the percentile range
+- ⚠️ Cannot calculate P0 or P100 (undefined)
+- ⚠️ Requires more data points for extreme percentiles
+- ✅ Preferred in some statistical contexts for theoretical rigor
+- ✅ Equivalent to Excel's `PERCENTILE.EXC()`
+
+**Excel/Google Sheets equivalent:**
+```excel
+=PERCENTILE.EXC(A1:A10, 0.95)
+```
+<!-- 
+### Statistical Theory -->
+
+**Linear Interpolation:**
+Both methods use linear interpolation when the calculated position falls between two data points:
+
+```
+value = data[floor(k)] + (k - floor(k)) × (data[ceil(k)] - data[floor(k)])
+```
+
+<!-- **Quantile Function:**
+Percentiles are specific quantiles of a probability distribution. The kth percentile is the value x such that:
+
+```
+P(X ≤ x) = k/100
+```
+
+Where X is a random variable representing the data distribution. -->
+
+**Sample vs. Population:**
+- **INC method** treats data as a complete population (includes endpoints)
+- **EXC method** treats data as a sample from a larger population (excludes endpoints)
+
+### Comparison Table
+
+| Aspect | PERCENTILE.INC | PERCENTILE.EXC |
+|--------|----------------|----------------|
+| **Formula** | k = p × (n - 1) + 1 | k = p × (n + 1) |
+| **Range** | P0 to P100 | P(1/(n+1)) to P(n/(n+1)) |
+| **Min/Max** | Can return actual min/max | Cannot return actual min/max |
+| **Excel Function** | `PERCENTILE.INC()` | `PERCENTILE.EXC()` |
+| **Google Sheets** | `PERCENTILE()` or `PERCENTILE.INC()` | `PERCENTILE.EXC()` |
+| **Default in App** | ✅ Recommended | Alternative |
+| **Use Case** | General capacity planning | Statistical analysis |
+
+### Which Method to Choose?
+
+**Use PERCENTILE.INC (Recommended) when:**
+- ✅ You need consistency with common spreadsheet tools (Excel, Google Sheets default)
+- ✅ You want to include actual observed minimum and maximum values
+- ✅ You're performing capacity planning or infrastructure sizing
+- ✅ You need to compare results with existing reports using standard percentile functions
+
+**Use PERCENTILE.EXC when:**
+- ✅ You require strict statistical methodology
+- ✅ You're working with sample data representing a larger population
+- ✅ You need to match specific statistical software or academic requirements
+- ✅ You have a large dataset (n > 100) where the difference is minimal
+
+### Practical Example with CPU Data
+
+Given 288 CPU utilization measurements (5-minute intervals over 24 hours):
+
+**Scenario:** Daily CPU cores = [2.1, 2.3, 2.5, ..., 15.8, ..., 3.2, 2.8]
+
+**PERCENTILE.INC (P95):**
+- Position: 0.95 × (288 - 1) + 1 = 273.65
+- Interpolate between values at positions 273 and 274
+- Result: **~14.2 cores**
+- Interpretation: "95% of the time, CPU usage is at or below 14.2 cores"
+
+**PERCENTILE.EXC (P95):**
+- Position: 0.95 × (288 + 1) = 274.55
+- Interpolate between values at positions 274 and 275
+- Result: **~14.3 cores**
+- Interpretation: "95% of intervals fall below 14.3 cores (excluding extremes)"
+
+**Difference:** With 288 data points, the difference is typically small (< 1%), but INC is more conservative for capacity planning.
