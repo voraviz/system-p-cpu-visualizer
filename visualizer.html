@@ -130,6 +130,34 @@
             <option value="actual">Actual Usage (Metric of Sums)</option>
         </select></div>
         <div style="grid-column: span 2;"><label>CPU Pools (Toggle Display)</label><div id="poolCheckboxes" class="checkbox-group"></div></div>
+        <div style="grid-column: span 2;">
+            <button id="calculateExceedBtn" class="hidden" onclick="calculateP90Exceed()" style="padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 14px; transition: background 0.2s;" onmouseover="this.style.background='#5a6268'" onmouseout="this.style.background='#6c757d'">Calculate Capacity Exceed Statistics</button>
+            <div id="exceedResults" class="hidden" style="margin-top: 15px; padding: 15px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 6px;">
+                <h4 style="margin: 0 0 10px 0; color: #495057; font-size: 14px;">Capacity Planning Exceed Statistics</h4>
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px;">
+                    <div style="background: white; padding: 12px; border-radius: 4px; border-left: 4px solid #ffc107;">
+                        <div style="font-size: 12px; color: #666; margin-bottom: 5px;">Total Minutes Exceeding</div>
+                        <div id="totalMinutesExceed" style="font-size: 24px; font-weight: bold; color: #f57c00;">0</div>
+                        <div style="font-size: 11px; color: #999; margin-top: 3px;">minutes</div>
+                    </div>
+                    <div style="background: white; padding: 12px; border-radius: 4px; border-left: 4px solid #ffc107;">
+                        <div style="font-size: 12px; color: #666; margin-bottom: 5px;">Days with Exceed</div>
+                        <div id="daysWithExceed" style="font-size: 24px; font-weight: bold; color: #f57c00;">0</div>
+                        <div style="font-size: 11px; color: #999; margin-top: 3px;">days</div>
+                    </div>
+                    <div style="background: white; padding: 12px; border-radius: 4px; border-left: 4px solid #dc3545;">
+                        <div style="font-size: 12px; color: #666; margin-bottom: 5px;">Total Cores Exceeded</div>
+                        <div id="totalCoresExceed" style="font-size: 24px; font-weight: bold; color: #dc3545;">0.00</div>
+                        <div style="font-size: 11px; color: #999; margin-top: 3px;">cumulative cores</div>
+                    </div>
+                    <div style="background: white; padding: 12px; border-radius: 4px; border-left: 4px solid #dc3545;">
+                        <div style="font-size: 12px; color: #666; margin-bottom: 5px;">Max Cores Exceeded</div>
+                        <div id="maxCoresExceed" style="font-size: 24px; font-weight: bold; color: #dc3545;">0.00</div>
+                        <div style="font-size: 11px; color: #999; margin-top: 3px;">peak cores</div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <div id="lparControls" class="controls hidden">
@@ -271,6 +299,12 @@
         const pools = Array.from(document.querySelectorAll('#poolCheckboxes input:checked')).map(i => i.value);
         const dates = Array.from(allDates).sort((a, b) => new Date(a) - new Date(b));
         const poolContainer = document.getElementById('poolBreakdown'); poolContainer.innerHTML = "";
+        
+        // Show/hide P90 exceed button based on metric and aggregation mode
+        const showP90Button = met.startsWith('p') && aggregationMode === 'capacity';
+        document.getElementById('calculateExceedBtn').classList.toggle('hidden', !showP90Button);
+        document.getElementById('exceedResults').classList.add('hidden');
+        
         if (!config[m] || dates.length === 0 || pools.length === 0) return;
 
         const datasets = pools.map((p, idx) => {
@@ -370,6 +404,98 @@
                 plugins: { legend: { position: 'bottom' }, tooltip: { mode: 'index', intersect: false } }
             }
         });
+    }
+
+    function calculateP90Exceed() {
+        const m = document.getElementById('machineSelect').value;
+        const met = document.getElementById('metricSelect').value;
+        const pools = Array.from(document.querySelectorAll('#poolCheckboxes input:checked')).map(i => i.value);
+        const dates = Array.from(allDates).sort((a, b) => new Date(a) - new Date(b));
+        
+        if (!config[m] || dates.length === 0 || pools.length === 0 || aggregationMode !== 'capacity') {
+            alert('Please ensure you are in Capacity Planning mode with a percentile metric selected.');
+            return;
+        }
+        
+        // Get the percentile value from the selected metric (e.g., "p90" -> 0.90)
+        const percentileValue = met.startsWith('p') ? parseInt(met.substring(1)) / 100 : 0.90;
+        
+        // Calculate capacity planning value for each date (sum of each LPAR's percentile)
+        const capacityPlanningValues = dates.map(d => {
+            return pools.reduce((sum, p) => {
+                return sum + config[m][p].reduce((lparSum, l) => {
+                    const stats = getLparStats(l, d);
+                    const percentile = calculatePercentile(stats.intervals, percentileValue);
+                    return lparSum + percentile;
+                }, 0);
+            }, 0);
+        });
+        
+        // Find the MAXIMUM capacity planning value across all dates
+        const maxCapacityPlanning = Math.max(...capacityPlanningValues);
+        const maxCapacityDate = dates[capacityPlanningValues.indexOf(maxCapacityPlanning)];
+        
+        let totalMinutesExceed = 0;
+        let daysWithExceed = 0;
+        let maxCoresExceeded = 0;
+        let totalCoresExceeded = 0;
+        
+        // For each date, check each interval against the MAX capacity planning value
+        dates.forEach((date) => {
+            let dayHasExceed = false;
+            
+            // Check each interval (5-minute period)
+            for (let intervalIdx = 0; intervalIdx < intervalsPerDay; intervalIdx++) {
+                // Sum actual usage across all LPARs in all pools for this interval
+                let intervalTotal = 0;
+                pools.forEach(p => {
+                    config[m][p].forEach(l => {
+                        const stats = getLparStats(l, date);
+                        intervalTotal += stats.intervals[intervalIdx];
+                    });
+                });
+                
+                // Check if this interval exceeds the MAX capacity planning threshold
+                if (intervalTotal > maxCapacityPlanning) {
+                    totalMinutesExceed += intervalMinutes;
+                    dayHasExceed = true;
+                    
+                    // Calculate cores exceeded for this interval
+                    const coresExceeded = intervalTotal - maxCapacityPlanning;
+                    
+                    // Track the maximum amount of cores exceeded (peak)
+                    if (coresExceeded > maxCoresExceeded) {
+                        maxCoresExceeded = coresExceeded;
+                    }
+                    
+                    // Add to total cumulative cores exceeded
+                    totalCoresExceeded += coresExceeded;
+                }
+            }
+            
+            if (dayHasExceed) {
+                daysWithExceed++;
+            }
+        });
+        
+        // Display results with additional info
+        document.getElementById('totalMinutesExceed').innerText = totalMinutesExceed.toLocaleString();
+        document.getElementById('daysWithExceed').innerText = daysWithExceed;
+        document.getElementById('totalCoresExceed').innerText = totalCoresExceeded.toFixed(2);
+        document.getElementById('maxCoresExceed').innerText = maxCoresExceeded.toFixed(2);
+        
+        // Update the results section to show the capacity planning threshold
+        const resultsDiv = document.getElementById('exceedResults');
+        const existingThreshold = resultsDiv.querySelector('.threshold-info');
+        if (existingThreshold) existingThreshold.remove();
+        
+        const thresholdInfo = document.createElement('div');
+        thresholdInfo.className = 'threshold-info';
+        thresholdInfo.style.cssText = 'margin-top: 10px; padding: 8px; background: #e9ecef; border-radius: 4px; font-size: 12px; color: #495057;';
+        thresholdInfo.innerHTML = `<strong>Max Capacity Planning Threshold (${met.toUpperCase()}):</strong> ${maxCapacityPlanning.toFixed(2)} cores<br><small>Occurred on: ${maxCapacityDate}</small>`;
+        resultsDiv.appendChild(thresholdInfo);
+        
+        resultsDiv.classList.remove('hidden');
     }
 </script>
 </body>

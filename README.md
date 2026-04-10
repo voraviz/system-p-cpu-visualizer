@@ -61,6 +61,11 @@ cpu-utilization-visualizer/
 -   **Aggregation Mode:** Select between two calculation methods (see [Aggregation Modes](#aggregation-modes) below).
 -   **Pool Toggling:** Dynamically show/hide individual CPU pools on the chart.
 -   **Summary Dashboard:** Displays the minimum and maximum total daily CPU cores across the entire period for the selected machine and metric, along with per-pool min/max statistics.
+-   **Capacity Exceed Statistics:** When using percentile metrics with Capacity Planning mode, calculate and display statistics for intervals where actual usage exceeds the maximum capacity planning threshold:
+    -   **Total Minutes Exceeding:** Total time (in minutes) where actual usage exceeded the capacity threshold
+    -   **Days with Exceed:** Number of days containing at least one exceeding interval
+    -   **Total Cores Exceeded:** Cumulative sum of cores exceeded across all intervals
+    -   **Max Cores Exceeded:** Peak single-interval exceedance (worst moment)
 
 ### LPAR Utilization View
 
