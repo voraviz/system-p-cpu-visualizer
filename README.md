@@ -21,6 +21,7 @@
   - [Data Formats](#data-formats)
     - [`config.ini`](#configini)
     - [CSV Performance Data](#csv-performance-data)
+    - [Supported Date Formats](#supported-date-formats)
   - [Example Data Generation (Python)](#example-data-generation-python)
   - [Architecture](#architecture)
   - [Technologies Used](#technologies-used)
@@ -62,16 +63,19 @@ cpu-utilization-visualizer/
 
 -   **Browser-based SPA:** Runs entirely in your web browser, no server-side setup required.
 -   **Data Ingestion:** Upload `config.ini` for machine and LPAR pool definitions, and multiple CSV files for LPAR performance data.
+-   **Flexible Date Formats:** Supports multiple date formats in CSV files (MM/DD/YYYY, DD/MM/YYYY, YYYY-MM-DD, etc.), configurable via `config.ini`. See [Supported Date Formats](#supported-date-formats) for details.
+-   **Date Range Filtering:** Select specific date ranges for analysis in both Machine and LPAR Utilization views using calendar widgets.
 -   **Configurable Standby LPARs:** LPARs defined in `config.ini` but without corresponding CSV data are treated as standby, using a configurable default CPU core value (defaulting to 0.1).
 -   **Percentile Calculation:** Supports both Inclusive (INC) and Exclusive (EXC) methods for percentile calculations, configurable via `config.ini`. See [Percentile Calculation Methods](#percentile-calculation-methods) for details.
 
 ### Machine Utilization View
 
 -   **Stacked Bar Chart:** Visualizes daily CPU utilization for a selected machine, stacked by CPU pool.
+-   **Date Range Selection:** Filter data by selecting start and end dates using calendar widgets. Default shows full date range (oldest to newest date).
 -   **Metric Selection:** Choose between Max, Average, or various Percentiles (P50, P60, P70, P80, P90, P95) for daily aggregation.
 -   **Aggregation Mode:** Select between two calculation methods (see [Aggregation Modes](#aggregation-modes) below).
 -   **Pool Toggling:** Dynamically show/hide individual CPU pools on the chart.
--   **Summary Dashboard:** Displays the minimum and maximum total daily CPU cores across the entire period for the selected machine and metric, along with per-pool min/max statistics.
+-   **Summary Dashboard:** Displays the minimum and maximum total daily CPU cores across the selected date range for the chosen machine and metric, along with per-pool min/max statistics.
 -   **Capacity Exceed Statistics:** When using percentile metrics with Capacity Planning mode, calculate and display statistics for intervals where actual usage exceeds the maximum capacity planning threshold:
     -   **Total Minutes Exceeding:** Total time (in minutes) where actual usage exceeded the capacity threshold
     -   **Days with Exceed:** Number of days containing at least one exceeding interval
@@ -80,9 +84,12 @@ cpu-utilization-visualizer/
 
 ### LPAR Utilization View
 
--   **Stacked Line Chart:** Shows intra-day CPU utilization (5-minute intervals) for selected LPARs on a specific date.
+-   **Stacked Line Chart:** Shows CPU utilization for selected LPARs with 5-minute interval granularity.
+-   **Date Range Selection:** Analyze single or multiple days using start and end date pickers. Default shows oldest date (single day view).
+-   **Sequential Multi-Day View:** When multiple dates are selected, displays continuous data from 00:00 of the first day to 23:55 of the last day.
+-   **Interactive Tooltips:** Hover over data points to see detailed information including date, time, and CPU core values.
 -   **Combined View:** Aggregates and displays the utilization of multiple selected LPARs.
--   **Summary Dashboard:** Provides detailed statistics for the selected LPARs' combined utilization, including Min, Max, Average, P50, P60, P70, P80, P90, and P95.
+-   **Summary Dashboard:** Provides detailed statistics calculated across all intervals in the selected date range, including Min, Max, Average, P50, P60, P70, P80, P90, and P95.
 
 ## Aggregation Modes
 
@@ -181,9 +188,18 @@ INTERVAL=5
 
 ![](images/machine.png)
 
+Select date range
+
+![](images/machine-with-date-range.png)
+
 ### LPAR CPU Utilization (by Date)
 
+
 ![](images/lpar.png)
+
+Select date range
+
+![](images/lpar-with-date-range.png)
 
 ### Capacity Exceed Percentile Planning
 
