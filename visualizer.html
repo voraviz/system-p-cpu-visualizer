@@ -175,7 +175,7 @@
 </div>
 
 <script>
-    let config = {}, lparData = {}, percentileMethod = 'INC', standbyValue = 0.1, intervalMinutes = 5, intervalsPerDay = 288, allDates = new Set(), currentTab = 'machine', chart = null, selectedLpars = new Set(), selectedPools = new Set(), aggregationMode = 'capacity', startDateFilter = null, endDateFilter = null;
+    let config = {}, lparData = {}, percentileMethod = 'INC', standbyValue = 0.1, intervalMinutes = 5, intervalsPerDay = 288, dateFormat = 'MM/DD/YYYY', allDates = new Set(), currentTab = 'machine', chart = null, selectedLpars = new Set(), selectedPools = new Set(), aggregationMode = 'capacity', startDateFilter = null, endDateFilter = null;
 
     document.getElementById('iniUpload').addEventListener('change', async (e) => {
         // Clean up config and selections when new config is loaded
@@ -187,6 +187,7 @@
         standbyValue = 0.1;
         intervalMinutes = 5;
         intervalsPerDay = 288;
+        dateFormat = 'MM/DD/YYYY';
         
         // Destroy existing chart
         if (chart) {
@@ -208,6 +209,7 @@
                     const k = key.trim().toUpperCase();
                     if (k === 'PERCENTILE') percentileMethod = val.trim().toUpperCase();
                     if (k === 'STANDBY') standbyValue = parseFloat(val.trim()) || 0.1;
+                    if (k === 'DATEFORMAT') dateFormat = val.trim().toUpperCase();
                     if (k === 'INTERVAL') {
                         intervalMinutes = parseInt(val.trim()) || 5;
                         intervalsPerDay = (24 * 60) / intervalMinutes;
@@ -242,12 +244,34 @@
         updateSelectors();
     });
 
+    function parseDateFromCSV(dateStr) {
+        // Parse date according to configured format
+        // Supported formats: MM/DD/YYYY, DD/MM/YYYY, YYYY-MM-DD, YYYY/MM/DD
+        const parts = dateStr.split(/[-\/]/);
+        let month, day, year;
+        
+        if (dateFormat === 'MM/DD/YYYY' || dateFormat === 'MM-DD-YYYY') {
+            [month, day, year] = parts;
+        } else if (dateFormat === 'DD/MM/YYYY' || dateFormat === 'DD-MM-YYYY') {
+            [day, month, year] = parts;
+        } else if (dateFormat === 'YYYY-MM-DD' || dateFormat === 'YYYY/MM/DD') {
+            [year, month, day] = parts;
+        } else {
+            // Default to MM/DD/YYYY
+            [month, day, year] = parts;
+        }
+        
+        // Return in standard MM/DD/YYYY format for internal use
+        return `${month.padStart(2, '0')}/${day.padStart(2, '0')}/${year}`;
+    }
+    
     function parseCSV(lpar, text) {
         const rows = text.split(/\r?\n/); lparData[lpar] = {};
         const expectedCols = intervalsPerDay + 1; // date + intervals
         rows.slice(1).forEach(row => {
             const cols = row.split(','); if (cols.length < expectedCols) return;
-            const date = cols[0].trim(); if (!date) return;
+            const dateStr = cols[0].trim(); if (!dateStr) return;
+            const date = parseDateFromCSV(dateStr);
             allDates.add(date);
             lparData[lpar][date] = { intervals: cols.slice(1, expectedCols).map(v => isNaN(parseFloat(v)) ? 0 : parseFloat(v)) };
         });

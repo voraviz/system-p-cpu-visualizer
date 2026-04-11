@@ -195,7 +195,7 @@ INTERVAL=5
 2.  **Upload `config.ini`:** Click "Upload config.ini" and select your configuration file. This defines your machines, CPU pools, and LPARs.
 3.  **Upload CSV Data:** Click "Upload CSV Data (Multiple)" and select all your LPAR performance CSV files.
     *   **CSV File Naming:** Each CSV file should be named after the LPAR (e.g., `lpar1.csv`).
-    *   **CSV Content:** Each row represents a day, starting with the date (mm/dd/yyyy) followed by 288 columns of 5-minute interval CPU utilization data.
+    *   **CSV Content:** Each row represents a day, starting with the date followed by 288 columns of 5-minute interval CPU utilization data (or fewer columns if using a different interval setting).
 4.  **Navigate Tabs:** Switch between "Machine Utilization" and "LPAR Utilization" tabs.
 5.  **Select Options:** Use the dropdowns and checkboxes to select machines, dates, metrics, and specific LPARs or CPU pools to visualize the data.
 
@@ -208,14 +208,16 @@ INTERVAL=5
 -   The `[MAIN]` section can define:
     -   `PERCENTILE` (INC/EXC) - Percentile calculation method
     -   `STANDBY` (numeric) - Default CPU cores for LPARs without CSV data
+    -   `DATEFORMAT` (string) - Date format in CSV files (default: MM/DD/YYYY)
     -   `INTERVAL` (numeric) - Time interval in minutes (default: 5)
 -   Lines starting with # are comments and will be ignored
     *   **Example `config.ini` structure:**
         ```ini
         [MAIN]
-        PERCENTILE=INC  ; or EXC
-        STANDBY=0.1     ; default value for standby LPARs if no CSV data
-        INTERVAL=5      ; time interval in minutes (5, 10, 15, 30, etc.)
+        PERCENTILE=INC      ; or EXC
+        STANDBY=0.1         ; default value for standby LPARs if no CSV data
+        DATEFORMAT=MM/DD/YYYY  ; date format in CSV files (MM/DD/YYYY, DD/MM/YYYY, YYYY-MM-DD, YYYY/MM/DD)
+        INTERVAL=5          ; time interval in minutes (5, 10, 15, 30, etc.)
         [MACHINE1]
         POOL1=LPAR1,LPAR3,LPAR5
         POOL2=LPAR7,LPAR9
@@ -228,25 +230,43 @@ INTERVAL=5
 
 -   **Filename:** `lparname.csv` (e.g., `lpar1.csv`).
 -   **Content:**
-    -   First column: Date in `mm/dd/yyyy` format (e.g., 04/30/2026)
+    -   First column: Date in the format specified by `DATEFORMAT` in config.ini (default: `MM/DD/YYYY`)
     -   Remaining columns: CPU utilization in cores for each time interval
     -   Number of columns depends on `INTERVAL` setting in config.ini:
         -   5 minutes → 288 columns (default)
         -   10 minutes → 144 columns
         -   15 minutes → 96 columns
         -   30 minutes → 48 columns
-    *   **Example CSV structure (5-minute intervals):**
+    *   **Example CSV structure (5-minute intervals, MM/DD/YYYY format):**
     ```csv
     Date,00:00,00:05,00:10,...,23:50,23:55
     04/01/2026,2.5,2.8,3.1,...,2.2,2.0
     04/02/2026,3.2,3.5,3.8,...,3.0,2.8
     ```
-    *   **Example CSV structure (15-minute intervals):**
+    *   **Example CSV structure (15-minute intervals, DD/MM/YYYY format):**
     ```csv
     Date,00:00,00:15,00:30,...,23:30,23:45
-    04/01/2026,2.5,2.8,3.1,...,2.2,2.0
-    04/02/2026,3.2,3.5,3.8,...,3.0,2.8
+    01/04/2026,2.5,2.8,3.1,...,2.2,2.0
+    02/04/2026,3.2,3.5,3.8,...,3.0,2.8
     ```
+    *   **Example CSV structure (YYYY-MM-DD format):**
+    ```csv
+    Date,00:00,00:05,00:10,...,23:50,23:55
+    2026-04-01,2.5,2.8,3.1,...,2.2,2.0
+    2026-04-02,3.2,3.5,3.8,...,3.0,2.8
+    ```
+
+### Supported Date Formats
+
+The `DATEFORMAT` parameter in `config.ini` supports the following formats:
+- `MM/DD/YYYY` - Month/Day/Year (default, US format) - e.g., 04/30/2026
+- `DD/MM/YYYY` - Day/Month/Year (European format) - e.g., 30/04/2026
+- `YYYY-MM-DD` - Year-Month-Day (ISO format) - e.g., 2026-04-30
+- `YYYY/MM/DD` - Year/Month/Day - e.g., 2026/04/30
+- `MM-DD-YYYY` - Month-Day-Year with dashes - e.g., 04-30-2026
+- `DD-MM-YYYY` - Day-Month-Year with dashes - e.g., 30-04-2026
+
+**Note:** All dates are converted internally to MM/DD/YYYY format for consistency.
 ## Example Data Generation (Python)
 
  [Data Generator](DATA_GENERATOR_GUIDE.md)
