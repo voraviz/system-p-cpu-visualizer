@@ -177,10 +177,9 @@
     let config = {}, lparData = {}, percentileMethod = 'INC', standbyValue = 0.1, intervalMinutes = 5, intervalsPerDay = 288, allDates = new Set(), currentTab = 'machine', chart = null, selectedLpars = new Set(), selectedPools = new Set(), aggregationMode = 'capacity', startDateFilter = null, endDateFilter = null;
 
     document.getElementById('iniUpload').addEventListener('change', async (e) => {
-        // Clean up all previous data when new config is loaded
+        // Clean up config and selections when new config is loaded
+        // Note: We preserve lparData and allDates to support loading CSV before INI
         config = {};
-        lparData = {};
-        allDates.clear();
         selectedPools.clear();
         selectedLpars.clear();
         percentileMethod = 'INC';
@@ -193,10 +192,6 @@
             chart.destroy();
             chart = null;
         }
-        
-        // Clear date inputs
-        document.getElementById('startDateSelect').value = '';
-        document.getElementById('endDateSelect').value = '';
         
         // Parse new config
         const text = await e.target.files[0].text(), lines = text.split(/\r?\n/);
