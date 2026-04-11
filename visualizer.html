@@ -514,6 +514,14 @@
         // Build sequential data across all dates (from 00:00 of first day to 23:55 of last day)
         const totalIntervals = datesInRange.length * intervalsPerDay;
         
+        // Store date information for each interval index for tooltip
+        const intervalDates = [];
+        datesInRange.forEach(date => {
+            for (let i = 0; i < intervalsPerDay; i++) {
+                intervalDates.push(date);
+            }
+        });
+        
         datasets = lpars.map((l, idx) => {
             const sequentialData = [];
             datesInRange.forEach(d => {
@@ -544,6 +552,9 @@
             }
         });
         
+        // Store interval dates for tooltip callback
+        window.lparIntervalDates = intervalDates;
+        
         // Calculate statistics from all intervals across all dates and LPARs
         const combinedIntervals = [];
         datesInRange.forEach(d => {
@@ -561,18 +572,36 @@
         const pKeys = ["P50","P60","P70","P80","P90","P95"];
         pKeys.forEach(p => document.getElementById(`lparStat${p}`).innerText = calculatePercentile(combinedIntervals, parseInt(p.substring(1))/100).toFixed(2));
         
-        initChart(labels, datasets);
+        initChart(labels, datasets, datesInRange.length > 1);
     }
 
-    function initChart(labels, datasets) {
+    function initChart(labels, datasets, isLparMultiDay = false) {
         if (chart) chart.destroy();
+        
+        const tooltipConfig = {
+            mode: 'index',
+            intersect: false
+        };
+        
+        // Add custom tooltip for LPAR multi-day view to show date
+        if (currentTab === 'lpar' && isLparMultiDay && window.lparIntervalDates) {
+            tooltipConfig.callbacks = {
+                title: function(context) {
+                    const index = context[0].dataIndex;
+                    const date = window.lparIntervalDates[index];
+                    const timeLabel = context[0].label;
+                    return `${date} ${timeLabel}`;
+                }
+            };
+        }
+        
         chart = new Chart(document.getElementById('cpuChart').getContext('2d'), {
             type: currentTab === 'machine' ? 'bar' : 'line',
             data: { labels, datasets },
             options: {
                 responsive: true, maintainAspectRatio: false,
                 scales: { x: { stacked: true }, y: { stacked: true, title: { display: true, text: 'Cores' } } },
-                plugins: { legend: { position: 'bottom' }, tooltip: { mode: 'index', intersect: false } }
+                plugins: { legend: { position: 'bottom' }, tooltip: tooltipConfig }
             }
         });
     }
