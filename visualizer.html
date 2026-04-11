@@ -59,7 +59,7 @@
         .tab-btn.active { color: #007bff; border-bottom: 3px solid #007bff; }
         .chart-container { position: relative; height: 550px; width: 100%; margin-top: 20px; padding: 10px; background: #fff; border: 1px solid #eee; border-radius: 8px; }
         label { display: block; font-weight: bold; margin-bottom: 8px; font-size: 14px; color: #444; }
-        select, input[type="file"] { width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; background: #fff; }
+        select, input[type="file"], input[type="date"] { width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; background: #fff; }
         .hidden { display: none !important; }
         .section-title { font-size: 16px; font-weight: bold; color: #444; margin: 20px 0 15px 0; padding-left: 10px; border-left: 5px solid #007bff; }
     </style>
@@ -129,6 +129,8 @@
             <option value="capacity">Capacity Planning (Sum of Metrics)</option>
             <option value="actual">Actual Usage (Metric of Sums)</option>
         </select></div>
+        <div><label>Start Date</label><input type="date" id="startDateSelect" onchange="updateMachineChart()" title="Select start date for data range (leave empty for all dates)"></div>
+        <div><label>End Date</label><input type="date" id="endDateSelect" onchange="updateMachineChart()" title="Select end date for data range (leave empty for all dates)"></div>
         <div style="grid-column: span 2;"><label>CPU Pools (Toggle Display)</label><div id="poolCheckboxes" class="checkbox-group"></div></div>
         <div style="grid-column: span 2;">
             <button id="calculateExceedBtn" class="hidden" onclick="calculateP90Exceed()" style="padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 14px; transition: background 0.2s;" onmouseover="this.style.background='#5a6268'" onmouseout="this.style.background='#6c757d'">Calculate Capacity Exceed Statistics</button>
@@ -170,7 +172,7 @@
 </div>
 
 <script>
-    let config = {}, lparData = {}, percentileMethod = 'INC', standbyValue = 0.1, intervalMinutes = 5, intervalsPerDay = 288, allDates = new Set(), currentTab = 'machine', chart = null, selectedLpars = new Set(), selectedPools = new Set(), aggregationMode = 'capacity';
+    let config = {}, lparData = {}, percentileMethod = 'INC', standbyValue = 0.1, intervalMinutes = 5, intervalsPerDay = 288, allDates = new Set(), currentTab = 'machine', chart = null, selectedLpars = new Set(), selectedPools = new Set(), aggregationMode = 'capacity', startDateFilter = null, endDateFilter = null;
 
     document.getElementById('iniUpload').addEventListener('change', async (e) => {
         const text = await e.target.files[0].text(), lines = text.split(/\r?\n/);
@@ -240,7 +242,64 @@
         const m1 = document.getElementById('machineSelect'), m2 = document.getElementById('lparMachineSelect'), ds = document.getElementById('dateSelect');
         m1.innerHTML = m2.innerHTML = Object.keys(config).map(m => `<option value="${m}">${m}</option>`).join('');
         ds.innerHTML = sortedDates.map(d => `<option value="${d}">${d}</option>`).join('');
+        
+        // Set min/max for date pickers and default values based on available data
+        if (sortedDates.length > 0) {
+            const minDate = formatDateForInput(sortedDates[0]);
+            const maxDate = formatDateForInput(sortedDates[sortedDates.length - 1]);
+            const startDateInput = document.getElementById('startDateSelect');
+            const endDateInput = document.getElementById('endDateSelect');
+            
+            startDateInput.min = minDate;
+            startDateInput.max = maxDate;
+            endDateInput.min = minDate;
+            endDateInput.max = maxDate;
+            
+            // Set default values to show full date range
+            startDateInput.value = minDate;
+            endDateInput.value = maxDate;
+        }
+        
         if (currentTab === 'machine') populatePoolCheckboxes(); else populateLparList();
+    }
+    
+    function formatDateForInput(dateStr) {
+        // Convert mm/dd/yyyy to yyyy-mm-dd for input[type="date"]
+        const parts = dateStr.split('/');
+        if (parts.length === 3) {
+            return `${parts[2]}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`;
+        }
+        return dateStr;
+    }
+    
+    function parseInputDate(inputDate) {
+        // Convert yyyy-mm-dd to mm/dd/yyyy
+        if (!inputDate) return null;
+        const parts = inputDate.split('-');
+        if (parts.length === 3) {
+            return `${parts[1]}/${parts[2]}/${parts[0]}`;
+        }
+        return inputDate;
+    }
+    
+    function getFilteredDates() {
+        const allDatesArray = Array.from(allDates).sort((a, b) => new Date(a) - new Date(b));
+        const startInput = document.getElementById('startDateSelect').value;
+        const endInput = document.getElementById('endDateSelect').value;
+        
+        if (!startInput && !endInput) {
+            return allDatesArray; // Show all dates if no filters
+        }
+        
+        const startDate = startInput ? parseInputDate(startInput) : null;
+        const endDate = endInput ? parseInputDate(endInput) : null;
+        
+        return allDatesArray.filter(d => {
+            const date = new Date(d);
+            if (startDate && new Date(startDate) > date) return false;
+            if (endDate && new Date(endDate) < date) return false;
+            return true;
+        });
     }
 
     function switchTab(tab) {
@@ -297,7 +356,7 @@
     function updateMachineChart() {
         const m = document.getElementById('machineSelect').value, met = document.getElementById('metricSelect').value;
         const pools = Array.from(document.querySelectorAll('#poolCheckboxes input:checked')).map(i => i.value);
-        const dates = Array.from(allDates).sort((a, b) => new Date(a) - new Date(b));
+        const dates = getFilteredDates();
         const poolContainer = document.getElementById('poolBreakdown'); poolContainer.innerHTML = "";
         
         // Show/hide P90 exceed button based on metric and aggregation mode
@@ -410,7 +469,7 @@
         const m = document.getElementById('machineSelect').value;
         const met = document.getElementById('metricSelect').value;
         const pools = Array.from(document.querySelectorAll('#poolCheckboxes input:checked')).map(i => i.value);
-        const dates = Array.from(allDates).sort((a, b) => new Date(a) - new Date(b));
+        const dates = getFilteredDates();
         
         if (!config[m] || dates.length === 0 || pools.length === 0 || aggregationMode !== 'capacity') {
             alert('Please ensure you are in Capacity Planning mode with a percentile metric selected.');
