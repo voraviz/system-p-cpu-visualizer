@@ -175,8 +175,30 @@
     let config = {}, lparData = {}, percentileMethod = 'INC', standbyValue = 0.1, intervalMinutes = 5, intervalsPerDay = 288, allDates = new Set(), currentTab = 'machine', chart = null, selectedLpars = new Set(), selectedPools = new Set(), aggregationMode = 'capacity', startDateFilter = null, endDateFilter = null;
 
     document.getElementById('iniUpload').addEventListener('change', async (e) => {
+        // Clean up all previous data when new config is loaded
+        config = {};
+        lparData = {};
+        allDates.clear();
+        selectedPools.clear();
+        selectedLpars.clear();
+        percentileMethod = 'INC';
+        standbyValue = 0.1;
+        intervalMinutes = 5;
+        intervalsPerDay = 288;
+        
+        // Destroy existing chart
+        if (chart) {
+            chart.destroy();
+            chart = null;
+        }
+        
+        // Clear date inputs
+        document.getElementById('startDateSelect').value = '';
+        document.getElementById('endDateSelect').value = '';
+        
+        // Parse new config
         const text = await e.target.files[0].text(), lines = text.split(/\r?\n/);
-        let currentSection = ''; config = {};
+        let currentSection = '';
         lines.forEach(line => {
             line = line.trim(); if (!line || line.startsWith(';') || line.startsWith('#')) return;
             if (line.startsWith('[') && line.endsWith(']')) {
@@ -199,6 +221,21 @@
     });
 
     document.getElementById('csvUpload').addEventListener('change', async (e) => {
+        // Clean up previous CSV data when new files are loaded
+        lparData = {};
+        allDates.clear();
+        
+        // Destroy existing chart
+        if (chart) {
+            chart.destroy();
+            chart = null;
+        }
+        
+        // Clear date inputs
+        document.getElementById('startDateSelect').value = '';
+        document.getElementById('endDateSelect').value = '';
+        
+        // Parse new CSV files
         const files = Array.from(e.target.files);
         for (const file of files) {
             const lparName = file.name.replace('.csv', '').toUpperCase(), text = await file.text();
