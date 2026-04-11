@@ -166,7 +166,8 @@
 
     <div id="lparControls" class="controls hidden">
         <div><label>Select Machine</label><select id="lparMachineSelect" onchange="selectedLpars.clear(); populateLparList()"></select></div>
-        <div><label>Select Date</label><select id="dateSelect" onchange="updateLparChart()"></select></div>
+        <div><label>Start Date</label><input type="date" id="lparStartDateSelect" onchange="updateLparChart()" title="Select start date for LPAR analysis"></div>
+        <div><label>End Date</label><input type="date" id="lparEndDateSelect" onchange="updateLparChart()" title="Select end date for LPAR analysis"></div>
         <div style="grid-column: span 2;"><label>Select LPARs</label><div id="lparCheckboxes" class="checkbox-group"></div></div>
     </div>
 
@@ -273,25 +274,35 @@
 
     function updateSelectors() {
         const sortedDates = Array.from(allDates).sort((a, b) => new Date(a) - new Date(b));
-        const m1 = document.getElementById('machineSelect'), m2 = document.getElementById('lparMachineSelect'), ds = document.getElementById('dateSelect');
+        const m1 = document.getElementById('machineSelect'), m2 = document.getElementById('lparMachineSelect');
         m1.innerHTML = m2.innerHTML = Object.keys(config).map(m => `<option value="${m}">${m}</option>`).join('');
-        ds.innerHTML = sortedDates.map(d => `<option value="${d}">${d}</option>`).join('');
         
         // Set min/max for date pickers and default values based on available data
         if (sortedDates.length > 0) {
             const minDate = formatDateForInput(sortedDates[0]);
             const maxDate = formatDateForInput(sortedDates[sortedDates.length - 1]);
+            
+            // Machine Utilization date pickers
             const startDateInput = document.getElementById('startDateSelect');
             const endDateInput = document.getElementById('endDateSelect');
-            
             startDateInput.min = minDate;
             startDateInput.max = maxDate;
             endDateInput.min = minDate;
             endDateInput.max = maxDate;
-            
             // Set default values to show full date range
             startDateInput.value = minDate;
             endDateInput.value = maxDate;
+            
+            // LPAR Utilization date pickers
+            const lparStartDateInput = document.getElementById('lparStartDateSelect');
+            const lparEndDateInput = document.getElementById('lparEndDateSelect');
+            lparStartDateInput.min = minDate;
+            lparStartDateInput.max = maxDate;
+            lparEndDateInput.min = minDate;
+            lparEndDateInput.max = maxDate;
+            // Set default: both start and end = oldest date (single day view)
+            lparStartDateInput.value = minDate;
+            lparEndDateInput.value = minDate;
         }
         
         if (currentTab === 'machine') populatePoolCheckboxes(); else populateLparList();
@@ -470,20 +481,87 @@
     }
 
     function updateLparChart() {
-        const d = document.getElementById('dateSelect').value, lpars = Array.from(document.querySelectorAll('#lparCheckboxes input:checked')).map(i => i.value);
-        if (!d || !lpars.length) { if (chart) chart.destroy(); return; }
-        const comb = Array(intervalsPerDay).fill(0);
-        const datasets = lpars.map((l, idx) => {
-            const data = getLparStats(l, d).intervals; data.forEach((v, i) => comb[i] += v);
-            return { label: l, data, fill: true, backgroundColor: `hsla(${idx * 45}, 70%, 50%, 0.5)`, pointRadius: 0 };
+        const startInput = document.getElementById('lparStartDateSelect').value;
+        const endInput = document.getElementById('lparEndDateSelect').value;
+        const lpars = Array.from(document.querySelectorAll('#lparCheckboxes input:checked')).map(i => i.value);
+        
+        if (!startInput || !endInput || !lpars.length) {
+            if (chart) chart.destroy();
+            return;
+        }
+        
+        const startDate = parseInputDate(startInput);
+        const endDate = parseInputDate(endInput);
+        
+        // Get all dates in range
+        const allDatesArray = Array.from(allDates).sort((a, b) => new Date(a) - new Date(b));
+        const datesInRange = allDatesArray.filter(d => {
+            const date = new Date(d);
+            return date >= new Date(startDate) && date <= new Date(endDate);
         });
-        document.getElementById('lparStatMin').innerText = Math.min(...comb).toFixed(2);
-        document.getElementById('lparStatMax').innerText = Math.max(...comb).toFixed(2);
-        document.getElementById('lparStatAvg').innerText = (comb.reduce((a,b)=>a+b,0)/intervalsPerDay).toFixed(2);
-        const pKeys = ["P50","P60","P70","P80","P90","P95"];
-        pKeys.forEach(p => document.getElementById(`lparStat${p}`).innerText = calculatePercentile(comb, parseInt(p.substring(1))/100).toFixed(2));
+        
+        if (datesInRange.length === 0) {
+            if (chart) chart.destroy();
+            return;
+        }
+        
+        // Collect all intervals across all dates and LPARs for statistics
+        const allIntervals = [];
+        
+        // For chart: if single date, show intraday; if multiple dates, show daily aggregates
+        let datasets, labels;
+        
+        // Build sequential data across all dates (from 00:00 of first day to 23:55 of last day)
+        const totalIntervals = datesInRange.length * intervalsPerDay;
+        
+        datasets = lpars.map((l, idx) => {
+            const sequentialData = [];
+            datesInRange.forEach(d => {
+                const intervals = getLparStats(l, d).intervals;
+                sequentialData.push(...intervals);
+            });
+            return {
+                label: l,
+                data: sequentialData,
+                fill: true,
+                backgroundColor: `hsla(${idx * 45}, 70%, 50%, 0.5)`,
+                pointRadius: 0
+            };
+        });
+        
+        // Create labels for all intervals across all dates
         const intervalsPerHour = 60 / intervalMinutes;
-        initChart(Array.from({length: intervalsPerDay}, (_, i) => `${Math.floor(i/intervalsPerHour)}:${((i%intervalsPerHour)*intervalMinutes).toString().padStart(2,'0')}`), datasets);
+        labels = [];
+        datesInRange.forEach((date, dayIdx) => {
+            for (let i = 0; i < intervalsPerDay; i++) {
+                const timeLabel = `${Math.floor(i/intervalsPerHour)}:${((i%intervalsPerHour)*intervalMinutes).toString().padStart(2,'0')}`;
+                // For multiple days, prefix with date for first interval of each day
+                if (datesInRange.length > 1 && i === 0) {
+                    labels.push(`${date} ${timeLabel}`);
+                } else {
+                    labels.push(timeLabel);
+                }
+            }
+        });
+        
+        // Calculate statistics from all intervals across all dates and LPARs
+        const combinedIntervals = [];
+        datesInRange.forEach(d => {
+            const dayCombined = Array(intervalsPerDay).fill(0);
+            lpars.forEach(l => {
+                const intervals = getLparStats(l, d).intervals;
+                intervals.forEach((v, i) => dayCombined[i] += v);
+            });
+            combinedIntervals.push(...dayCombined);
+        });
+        
+        document.getElementById('lparStatMin').innerText = Math.min(...combinedIntervals).toFixed(2);
+        document.getElementById('lparStatMax').innerText = Math.max(...combinedIntervals).toFixed(2);
+        document.getElementById('lparStatAvg').innerText = (combinedIntervals.reduce((a,b)=>a+b,0)/combinedIntervals.length).toFixed(2);
+        const pKeys = ["P50","P60","P70","P80","P90","P95"];
+        pKeys.forEach(p => document.getElementById(`lparStat${p}`).innerText = calculatePercentile(combinedIntervals, parseInt(p.substring(1))/100).toFixed(2));
+        
+        initChart(labels, datasets);
     }
 
     function initChart(labels, datasets) {
