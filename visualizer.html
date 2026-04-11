@@ -131,10 +131,14 @@
         </select></div>
         <div><label>Start Date</label><input type="date" id="startDateSelect" onchange="updateMachineChart()" title="Select start date for data range (leave empty for all dates)"></div>
         <div><label>End Date</label><input type="date" id="endDateSelect" onchange="updateMachineChart()" title="Select end date for data range (leave empty for all dates)"></div>
-        <div style="grid-column: span 2;"><label>CPU Pools (Toggle Display)</label><div id="poolCheckboxes" class="checkbox-group"></div></div>
         <div style="grid-column: span 2;">
-            <button id="calculateExceedBtn" class="hidden" onclick="calculateP90Exceed()" style="padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 14px; transition: background 0.2s;" onmouseover="this.style.background='#5a6268'" onmouseout="this.style.background='#6c757d'">Calculate Capacity Exceed Statistics</button>
-            <div id="exceedResults" class="hidden" style="margin-top: 15px; padding: 15px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 6px;">
+            <label>CPU Pools</label>
+            <div id="poolCheckboxes" class="checkbox-group"></div>
+            <button id="calculateExceedBtn" class="hidden" onclick="calculateP90Exceed()" style="padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 14px; transition: background 0.2s; margin-top: 10px; width: auto;" onmouseover="this.style.background='#5a6268'" onmouseout="this.style.background='#6c757d'">Calculate Capacity Exceed Statistics</button>
+        </div>
+    </div>
+
+    <div id="exceedResults" class="hidden" style="margin: 20px 0; padding: 15px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 6px;">
                 <h4 style="margin: 0 0 10px 0; color: #495057; font-size: 14px;">Capacity Planning Exceed Statistics</h4>
                 <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px;">
                     <div style="background: white; padding: 12px; border-radius: 4px; border-left: 4px solid #ffc107;">
@@ -157,8 +161,6 @@
                         <div id="maxCoresExceed" style="font-size: 24px; font-weight: bold; color: #dc3545;">0.00</div>
                         <div style="font-size: 11px; color: #999; margin-top: 3px;">peak cores</div>
                     </div>
-                </div>
-            </div>
         </div>
     </div>
 
