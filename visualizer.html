@@ -757,11 +757,13 @@
                                     <th>Actual peak</th>
                                     <th>Reference sizing</th>
                                     <th>Status</th>
-                                    <th>Available %</th>
+                                    <th>% Available</th>
+                                    <th>Exceed Minutes/year</th>
+                                    <th>Exceed Cores/year</th>
                                 </tr>
                             </thead>
                             <tbody id="capacityPlanningResultsBody">
-                                <tr><td colspan="5">Run capacity planning calculation to view yearly results.</td></tr>
+                                <tr><td colspan="7">Run capacity planning calculation to view yearly results.</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -778,10 +780,10 @@
                             <thead>
                                 <tr>
                                     <th>Year</th>
-                                    <th>Max capacity planning peak</th>
+                                    <th>Sum of Max</th>
                                     <th>Reference sizing</th>
                                     <th>Status</th>
-                                    <th>Available %</th>
+                                    <th>% Available</th>
                                 </tr>
                             </thead>
                             <tbody id="capacityPlanningPeakResultsBody">
@@ -1321,13 +1323,14 @@
         });
     }
 
-    function buildCapacityPlanningRows(comparisonValue, referenceSizing, years, growthRate) {
+    function buildCapacityPlanningRows(comparisonValue, referenceSizing, years, growthRate, annualExceedanceByYear = null) {
         const rows = [];
         for (let yearIndex = 1; yearIndex <= years; yearIndex++) {
             const growthMultiplier = Math.pow(1 + growthRate, yearIndex - 1);
             const yearComparisonValue = comparisonValue * growthMultiplier;
             const availablePercent = referenceSizing > 0 ? ((referenceSizing - yearComparisonValue) / referenceSizing) * 100 : 0;
             const isEnough = referenceSizing >= yearComparisonValue;
+            const yearExceedance = annualExceedanceByYear?.[yearIndex - 1] || { minutes: 0, cores: 0 };
 
             rows.push(`
                 <tr>
@@ -1336,11 +1339,51 @@
                     <td>${referenceSizing.toFixed(0)}</td>
                     <td><span class="capacity-status ${isEnough ? 'enough' : 'not-enough'}">${isEnough ? 'Enough' : 'Not enough'}</span></td>
                     <td>${availablePercent.toFixed(2)}%</td>
+                    ${annualExceedanceByYear ? `<td>${isEnough ? '' : yearExceedance.minutes.toFixed(0)}</td><td>${isEnough ? '' : yearExceedance.cores.toFixed(2)}</td>` : ''}
                 </tr>
             `);
         }
 
         return rows.join('');
+    }
+
+    function calculateAnnualizedActualExceedance(machine, pools, referenceSizing, growthRate, years, dates) {
+        const sampledDayCount = dates.length || 0;
+        if (!sampledDayCount) {
+            return Array.from({ length: years }, () => ({ minutes: 0, cores: 0 }));
+        }
+
+        const annualizationFactor = 360 / sampledDayCount;
+
+        return Array.from({ length: years }, (_, yearIndex) => {
+            const growthMultiplier = Math.pow(1 + growthRate, yearIndex);
+            let totalExceededIntervals = 0;
+            let totalExceededCores = 0;
+
+            dates.forEach(d => {
+                const combined = Array(intervalsPerDay).fill(0);
+                pools.forEach(p => {
+                    config[machine][p].forEach(l => {
+                        const intervals = getLparStats(l, d).intervals;
+                        intervals.forEach((v, i) => {
+                            combined[i] += v * growthMultiplier;
+                        });
+                    });
+                });
+
+                combined.forEach(value => {
+                    if (value > referenceSizing) {
+                        totalExceededIntervals += 1;
+                        totalExceededCores += value - referenceSizing;
+                    }
+                });
+            });
+
+            return {
+                minutes: totalExceededIntervals * intervalMinutes * annualizationFactor,
+                cores: totalExceededCores * annualizationFactor
+            };
+        });
     }
 
     function updateCapacityPlanningTable() {
@@ -1356,7 +1399,7 @@
             document.getElementById('capacityPlanningBaseValue').innerText = '0.00';
             document.getElementById('capacityPlanningObservedPeak').innerText = '0.00';
             document.getElementById('capacityPlanningReferenceSizing').innerText = '0';
-            resultsBody.innerHTML = '<tr><td colspan="5">Select a machine and at least one CPU pool.</td></tr>';
+            resultsBody.innerHTML = '<tr><td colspan="7">Select a machine and at least one CPU pool.</td></tr>';
             peakResultsBody.innerHTML = '<tr><td colspan="5">Select a machine and at least one CPU pool.</td></tr>';
             return;
         }
@@ -1366,7 +1409,7 @@
             document.getElementById('capacityPlanningBaseValue').innerText = '0.00';
             document.getElementById('capacityPlanningObservedPeak').innerText = '0.00';
             document.getElementById('capacityPlanningReferenceSizing').innerText = '0';
-            resultsBody.innerHTML = '<tr><td colspan="5">No data available for capacity planning.</td></tr>';
+            resultsBody.innerHTML = '<tr><td colspan="7">No data available for capacity planning.</td></tr>';
             peakResultsBody.innerHTML = '<tr><td colspan="5">No data available for capacity planning.</td></tr>';
             return;
         }
@@ -1382,7 +1425,9 @@
         document.getElementById('capacityPlanningObservedPeak').innerText = observedActualPeak.toFixed(2);
         document.getElementById('capacityPlanningReferenceSizing').innerText = referenceSizing.toLocaleString();
 
-        resultsBody.innerHTML = buildCapacityPlanningRows(observedActualPeak, referenceSizing, years, growthRate);
+        const annualizedActualExceedance = calculateAnnualizedActualExceedance(machine, pools, referenceSizing, growthRate, years, dates);
+
+        resultsBody.innerHTML = buildCapacityPlanningRows(observedActualPeak, referenceSizing, years, growthRate, annualizedActualExceedance);
         peakResultsBody.innerHTML = buildCapacityPlanningRows(maxCapacityPlanningPeak, referenceSizing, years, growthRate);
     }
 

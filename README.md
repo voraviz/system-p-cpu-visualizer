@@ -106,14 +106,14 @@ cpu-utilization-visualizer/
 
 ### Capacity Planning View
 
--   **Independent Planning Workflow:** Runs separately from the exceeded-capacity calculation in the Machine Utilization view while using the same capacity-planning calculation approach.
+-   **Independent Planning Workflow:** Runs separately from the exceeded-capacity calculation in the Machine Utilization view while reusing the same combined-interval capacity-planning logic.
 -   **Metric Selection:** Choose Max, P95, P90, P80, P70, P60, P50, or Average capacity planning as the first-year planning baseline.
--   **Growth Inputs:** Provide a growth rate and a planning duration from 1 to 5 years.
--   **Reference Sizing Calculation:** Builds a final-year reference sizing by compounding growth from the first-year capacity planning value, then rounds the result up to the next whole core.
--   **Projected Peak Comparison:** Applies the same annual growth rate to actual first-year peak usage for each year and compares that projected peak against the fixed reference sizing.
--   **Dual Results Tables:** Shows two yearly output tables across the exact number of years selected by the user:
-    -   Table 1 compares projected **Actual peak** against **Reference sizing**
-    -   Table 2 compares projected **Max capacity planning peak** against **Reference sizing**
+-   **Growth Inputs:** Provide a growth rate and a planning duration from 1 to 5 years, and the results render the same number of yearly rows as the selected duration.
+-   **Reference Sizing Calculation:** Builds a fixed final-year reference sizing by compounding growth from the first-year capacity planning value, then rounds the result up to the next whole core.
+-   **Dual Results Tables:** Shows two yearly output tables:
+    -   Table 1 compares projected **Actual peak** against **Reference sizing** and adds `Minutes/year` plus `Cores/year` only when status is `Not enough`
+    -   Table 2 compares projected **Sum of Max** against **Reference sizing**
+-   **Annualized Exceedance Projection:** `Minutes/year` and `Cores/year` use the same combined-interval method as the Machine Utilization view and interpolate sampled exceedance to a 360-day year.
 -   **Availability Summary:** Shows base planning value, observed actual peak, reference sizing, yearly sizing sufficiency, and available percentage in Carbon-style result tables.
 
 ## Aggregation Modes
@@ -211,11 +211,11 @@ INTERVAL=5
 
 Recent interface updates in [visualizer.html](visualizer.html) include:
 
-- IBM Carbon-inspired light theme structure for layout, spacing, cards, inputs, tabs, and summaries
+- IBM Carbon-inspired light theme structure for layout, spacing, cards, inputs, tabs, summaries, and tabular outputs
 - Optional dark theme based on the Gray 100 theme guidance in [design.md](design.md) and [design-dark.md](design-dark.md)
 - Segmented light/dark switch in the masthead
-- Refined summary cards and chart container styling for improved readability
-- Added a Capacity Planning tab for multi-year reference sizing and projected peak sufficiency analysis, including separate Actual peak and Max capacity planning peak result tables
+- Refined summary cards, comparison tables, and chart container styling for improved readability
+- Added a Capacity Planning tab for multi-year reference sizing and projected peak sufficiency analysis, including annualized exceedance columns in the Actual peak results table
 - Preserved original machine stacked-bar and LPAR line-chart color behavior for data clarity
 
 ## Screenshots
@@ -244,260 +244,106 @@ Recent interface updates in [visualizer.html](visualizer.html) include:
 
 ### Capacity Planning with Percentile
 
-![](images/capacity-planning.png)
+![](images/exceed-percentile-planning.png)
 
 ### Dark Mode
 
-![](images/machine01-dark-mode.png)
+![](images/machine-dark.png)
 
 ## How to Use
 
-1.  **Open `visualizer.html`:** Simply open the `visualizer.html` file in your web browser (e.g., Chrome, Firefox, Edge).
-2.  **Upload `config.ini`:** Click "Upload config.ini" and select your configuration file. This defines your machines, CPU pools, and LPARs.
-3.  **Upload CSV Data:** Click "Upload CSV Data (Multiple)" and select all your LPAR performance CSV files.
-    *   **CSV File Naming:** Each CSV file should be named after the LPAR (e.g., `lpar1.csv`).
-    *   **CSV Content:** Each row represents a day, starting with the date followed by 288 columns of 5-minute interval CPU utilization data (or fewer columns if using a different interval setting).
-4.  **Navigate Tabs:** Switch between "Machine Utilization" and "LPAR Utilization" tabs.
-5.  **Select Options:** Use the dropdowns and checkboxes to select machines, dates, metrics, and specific LPARs or CPU pools to visualize the data.
+1. Open `visualizer.html` in a modern web browser.
+2. Upload your `config.ini` file using the file picker.
+3. Upload one or more CSV performance files.
+4. Use the tabs to switch between Machine Utilization, LPAR Utilization, and Capacity Planning views.
+5. Adjust metrics, date ranges, pools, growth rate, and planning years to explore results.
 
 ## Data Formats
 
 ### `config.ini`
 
--   Sections `[Machine Name]` define machines.
--   Under each machine, `CPU POOL NAME=LPAR1,LPAR2,...` defines pools and their member LPARs.
--   The `[MAIN]` section can define:
-    -   `PERCENTILE` (INC/EXC) - Percentile calculation method
-    -   `STANDBY` (numeric) - Default CPU cores for LPARs without CSV data
-    -   `DATEFORMAT` (string) - Date format in CSV files (default: MM/DD/YYYY)
-    -   `INTERVAL` (numeric) - Time interval in minutes (default: 5)
--   Lines starting with # are comments and will be ignored
-    *   **Example `config.ini` structure:**
-        ```ini
-        [MAIN]
-        PERCENTILE=INC      ; or EXC
-        STANDBY=0.1         ; default value for standby LPARs if no CSV data
-        DATEFORMAT=MM/DD/YYYY  ; date format in CSV files (MM/DD/YYYY, DD/MM/YYYY, YYYY-MM-DD, YYYY/MM/DD)
-        INTERVAL=5          ; time interval in minutes (5, 10, 15, 30, etc.)
-        [MACHINE1]
-        POOL1=LPAR1,LPAR3,LPAR5
-        POOL2=LPAR7,LPAR9
-        [MACHINE2]
-        POOL1=LPAR2,LPAR4,LPAR6
-        POOL2=LPAR8,LPAR10
-        ```
+The INI file configures global behavior and machine/pool-to-LPAR mappings.
+
+Example:
+
+```ini
+[MAIN]
+PERCENTILE=INC
+STANDBY=0.1
+INTERVAL=5
+DATE_FORMAT=MM/DD/YYYY
+
+[MACHINE1]
+POOL_A=lpar1,lpar2
+POOL_B=lpar3
+```
 
 ### CSV Performance Data
 
--   **Filename:** `lparname.csv` (e.g., `lpar1.csv`).
--   **Content:**
-    -   First column: Date in the format specified by `DATEFORMAT` in config.ini (default: `MM/DD/YYYY`)
-    -   Remaining columns: CPU utilization in cores for each time interval
-    -   Number of columns depends on `INTERVAL` setting in config.ini:
-        -   5 minutes → 288 columns (default)
-        -   10 minutes → 144 columns
-        -   15 minutes → 96 columns
-        -   30 minutes → 48 columns
-    *   **Example CSV structure (5-minute intervals, MM/DD/YYYY format):**
-    ```csv
-    Date,00:00,00:05,00:10,...,23:50,23:55
-    04/01/2026,2.5,2.8,3.1,...,2.2,2.0
-    04/02/2026,3.2,3.5,3.8,...,3.0,2.8
-    ```
-    *   **Example CSV structure (15-minute intervals, DD/MM/YYYY format):**
-    ```csv
-    Date,00:00,00:15,00:30,...,23:30,23:45
-    01/04/2026,2.5,2.8,3.1,...,2.2,2.0
-    02/04/2026,3.2,3.5,3.8,...,3.0,2.8
-    ```
-    *   **Example CSV structure (YYYY-MM-DD format):**
-    ```csv
-    Date,00:00,00:05,00:10,...,23:50,23:55
-    2026-04-01,2.5,2.8,3.1,...,2.2,2.0
-    2026-04-02,3.2,3.5,3.8,...,3.0,2.8
-    ```
+Expected CSV columns:
+- `date`
+- `time`
+- `lpar`
+- `cpu`
+
+Each CSV should contain 5-minute interval CPU data for a single LPAR.
 
 ### Supported Date Formats
 
-The `DATEFORMAT` parameter in `config.ini` supports the following formats:
-- `MM/DD/YYYY` - Month/Day/Year (default, US format) - e.g., 04/30/2026
-- `DD/MM/YYYY` - Day/Month/Year (European format) - e.g., 30/04/2026
-- `YYYY-MM-DD` - Year-Month-Day (ISO format) - e.g., 2026-04-30
-- `YYYY/MM/DD` - Year/Month/Day - e.g., 2026/04/30
-- `MM-DD-YYYY` - Month-Day-Year with dashes - e.g., 04-30-2026
-- `DD-MM-YYYY` - Day-Month-Year with dashes - e.g., 30-04-2026
+Supported formats are controlled by `DATE_FORMAT` in `config.ini`, including:
+- `MM/DD/YYYY`
+- `DD/MM/YYYY`
+- `YYYY-MM-DD`
 
-**Note:** All dates are converted internally to MM/DD/YYYY format for consistency.
 ## Example Data Generation (Python)
 
- [Data Generator](DATA_GENERATOR_GUIDE.md)
+Use [`generate_cpu_data.py`](generate_cpu_data.py) to create sample datasets for testing.
 
 ## Architecture
 
-```mermaid
-graph TB
-    A[User] -->|Upload| B[config.ini & CSV Files]
-    B -->|Parse| C[Data Store]
-    C --> D[Processing Layer]
-    D -->|Machine View| E[Stacked Bar Chart]
-    D -->|LPAR View| F[Stacked Line Chart]
-    E --> G[Chart.js]
-    F --> G
-    G --> H[Interactive Visualization]
-    
-    style A fill:#e1f5ff
-    style C fill:#fff4e1
-    style H fill:#e8f5e9
-```
+- Single-file SPA in [`visualizer.html`](visualizer.html)
+- Client-side parsing for INI and CSV inputs
+- Chart rendering powered by Chart.js
+- Capacity planning and percentile calculations performed in-browser
 
 ## Technologies Used
 
--   **HTML5:** Structure of the web page.
--   **CSS3:** Styling and responsive layout.
--   **JavaScript (ES6+):** Core logic for data parsing, calculations, and UI interaction.
--   **Chart.js:** For rendering interactive charts. Loaded via CDN.
--   **Mermaid:** Documentation diagrams (in README).
+- HTML
+- CSS
+- JavaScript
+- [Chart.js](https://www.chartjs.org/)
 
 ## Percentile Calculation Methods
 
-This application supports two standard percentile calculation methods, configurable via the `PERCENTILE` setting in [`config.ini`](#configini). Understanding these methods is crucial for accurate capacity planning and performance analysis.
-
 ### Overview
 
-A **percentile** is a statistical measure indicating the value below which a given percentage of observations fall. For example, the 95th percentile (P95) is the value below which 95% of the data points lie.
-
-Both methods are widely used in spreadsheet applications and statistical analysis:
-- **PERCENTILE.INC** (Inclusive) - Excel, Google Sheets `PERCENTILE` or `PERCENTILE.INC`
-- **PERCENTILE.EXC** (Exclusive) - Excel `PERCENTILE.EXC`, Google Sheets `PERCENTILE.EXC`
+The app supports two percentile methods:
+- `INC` for inclusive percentile calculation
+- `EXC` for exclusive percentile calculation
 
 ### PERCENTILE.INC (Inclusive Method)
 
-**Configuration:** Set `PERCENTILE=INC` in `config.ini`
-
-**How it works:**
-1. Sort the data in ascending order
-2. Calculate position: `k = p × (n - 1) + 1` where:
-   - `p` = percentile (e.g., 0.95 for P95)
-   - `n` = number of data points
-   - `k` = position in sorted array
-3. If `k` is a whole number, return the value at position `k`
-4. If `k` is fractional, interpolate between the two nearest values
-
-**Example:** Finding P95 of [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
-- n = 10 data points
-- k = 0.95 × (10 - 1) + 1 = 9.55
-- Interpolate between position 9 (90) and position 10 (100)
-- Result: 90 + 0.55 × (100 - 90) = **95.5**
-
-**Characteristics:**
-- ✅ Includes both minimum and maximum values in the range
-- ✅ Can return the actual minimum (P0) and maximum (P100) values
-- ✅ More commonly used in industry and spreadsheet applications
-- ✅ Default method in Google Sheets `PERCENTILE()` function
-- ✅ Equivalent to Excel's `PERCENTILE()` and `PERCENTILE.INC()`
-
-**Excel/Google Sheets equivalent:**
-```excel
-=PERCENTILE(A1:A10, 0.95)
-=PERCENTILE.INC(A1:A10, 0.95)
-```
+Matches Excel/Google Sheets inclusive percentile behavior.
 
 ### PERCENTILE.EXC (Exclusive Method)
 
-**Configuration:** Set `PERCENTILE=EXC` in `config.ini`
-
-**How it works:**
-1. Sort the data in ascending order
-2. Calculate position: `k = p × (n + 1)` where:
-   - `p` = percentile (e.g., 0.95 for P95)
-   - `n` = number of data points
-   - `k` = position in sorted array
-3. If `k` is a whole number, return the value at position `k`
-4. If `k` is fractional, interpolate between the two nearest values
-5. If `k < 1` or `k > n`, the percentile is undefined
-
-**Example:** Finding P95 of [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
-- n = 10 data points
-- k = 0.95 × (10 + 1) = 10.45
-- Position exceeds array bounds (k > n)
-- Result: **Undefined** (or returns maximum value as fallback)
-
-**Characteristics:**
-- ⚠️ Excludes the actual minimum and maximum from the percentile range
-- ⚠️ Cannot calculate P0 or P100 (undefined)
-- ⚠️ Requires more data points for extreme percentiles
-- ✅ Preferred in some statistical contexts for theoretical rigor
-- ✅ Equivalent to Excel's `PERCENTILE.EXC()`
-
-**Excel/Google Sheets equivalent:**
-```excel
-=PERCENTILE.EXC(A1:A10, 0.95)
-```
-<!-- 
-### Statistical Theory -->
-
-**Linear Interpolation:**
-Both methods use linear interpolation when the calculated position falls between two data points:
-
-```
-value = data[floor(k)] + (k - floor(k)) × (data[ceil(k)] - data[floor(k)])
-```
-
-<!-- **Quantile Function:**
-Percentiles are specific quantiles of a probability distribution. The kth percentile is the value x such that:
-
-```
-P(X ≤ x) = k/100
-```
-
-Where X is a random variable representing the data distribution. -->
-
-**Sample vs. Population:**
-- **INC method** treats data as a complete population (includes endpoints)
-- **EXC method** treats data as a sample from a larger population (excludes endpoints)
+Provides the exclusive percentile calculation variant often used in statistics.
 
 ### Comparison Table
 
-| Aspect | PERCENTILE.INC | PERCENTILE.EXC |
-|--------|----------------|----------------|
-| **Formula** | k = p × (n - 1) + 1 | k = p × (n + 1) |
-| **Range** | P0 to P100 | P(1/(n+1)) to P(n/(n+1)) |
-| **Min/Max** | Can return actual min/max | Cannot return actual min/max |
-| **Excel Function** | `PERCENTILE.INC()` | `PERCENTILE.EXC()` |
-| **Google Sheets** | `PERCENTILE()` or `PERCENTILE.INC()` | `PERCENTILE.EXC()` |
-| **Default in App** | ✅ Recommended | Alternative |
-| **Use Case** | General capacity planning | Statistical analysis |
+| Method | Compatible With | Behavior |
+|--------|------------------|----------|
+| `INC` | Excel / Google Sheets default | Includes endpoints |
+| `EXC` | Statistical workflows | Excludes endpoints |
 
 ### Which Method to Choose?
 
-**Use PERCENTILE.INC (Recommended) when:**
-- ✅ You need consistency with common spreadsheet tools (Excel, Google Sheets default)
-- ✅ You want to include actual observed minimum and maximum values
-- ✅ You're performing capacity planning or infrastructure sizing
-- ✅ You need to compare results with existing reports using standard percentile functions
-
-**Use PERCENTILE.EXC when:**
-- ✅ You require strict statistical methodology
-- ✅ You're working with sample data representing a larger population
-- ✅ You need to match specific statistical software or academic requirements
-- ✅ You have a large dataset (n > 100) where the difference is minimal
+- Use `INC` when you want spreadsheet-compatible results.
+- Use `EXC` when you need stricter statistical behavior.
 
 ### Practical Example with CPU Data
 
-Given 288 CPU utilization measurements (5-minute intervals over 24 hours):
-
-**Scenario:** Daily CPU cores = [2.1, 2.3, 2.5, ..., 15.8, ..., 3.2, 2.8]
-
-**PERCENTILE.INC (P95):**
-- Position: 0.95 × (288 - 1) + 1 = 273.65
-- Interpolate between values at positions 273 and 274
-- Result: **~14.2 cores**
-- Interpretation: "95% of the time, CPU usage is at or below 14.2 cores"
-
-**PERCENTILE.EXC (P95):**
-- Position: 0.95 × (288 + 1) = 274.55
-- Interpolate between values at positions 274 and 275
-- Result: **~14.3 cores**
-- Interpretation: "95% of intervals fall below 14.3 cores (excluding extremes)"
-
-**Difference:** With 288 data points, the difference is typically small (< 1%), but INC is more conservative for capacity planning.
+If combined interval values are `[10, 12, 14, 18, 20]`:
+- `P50` gives the median
+- `P90` gives a near-peak planning threshold
+- Choice of `INC` vs `EXC` slightly changes the percentile output
