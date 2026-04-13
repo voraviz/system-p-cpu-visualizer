@@ -290,6 +290,20 @@
         .checkbox-item input { width: 16px; height: 16px; margin: 0; accent-color: var(--cds-link-primary); cursor: pointer; }
         .checkbox-actions { display: flex; justify-content: flex-start; margin-top: 16px; }
 
+        .primary-button {
+            min-height: 48px;
+            padding: 14px 63px 14px 15px;
+            border: 1px solid transparent;
+            border-radius: 0;
+            cursor: pointer;
+            background: var(--cds-button-primary);
+            color: var(--cds-text-on-color);
+            transition: background-color 0.2s ease;
+        }
+
+        .primary-button:hover { background: var(--cds-button-primary-hover); }
+        .primary-button:active { background: var(--cds-button-primary-active); }
+
         .button-secondary {
             min-height: 48px;
             padding: 14px 63px 14px 15px;
@@ -334,6 +348,77 @@
         .stat-card h3 { margin: 0; color: var(--cds-text-secondary); font-size: 0.75rem; line-height: 1.33; letter-spacing: 0.32px; font-weight: 400; text-transform: uppercase; }
         .stat-val { margin-top: 8px; font-size: 2rem; line-height: 1.25; font-weight: 400; letter-spacing: 0; color: var(--cds-text-primary); }
         .stat-date, .stat-label { color: var(--cds-text-secondary); font-size: 0.75rem; line-height: 1.33; letter-spacing: 0.32px; }
+
+        .table-container {
+            margin-top: 32px;
+            overflow-x: auto;
+            background: var(--cds-background);
+            border: 1px solid var(--cds-border-subtle);
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--cds-background);
+        }
+
+        .data-table thead th {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--cds-border-subtle);
+            background: var(--cds-layer-01);
+            color: var(--cds-text-secondary);
+            font-size: 0.75rem;
+            line-height: 1.33;
+            letter-spacing: 0.32px;
+            font-weight: 400;
+            text-align: left;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+
+        .data-table tbody td {
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--cds-border-subtle);
+            color: var(--cds-text-primary);
+            font-size: 0.875rem;
+            line-height: 1.29;
+            letter-spacing: 0.16px;
+            background: var(--cds-background);
+        }
+
+        .data-table tbody tr:nth-child(even) td {
+            background: var(--cds-layer-01);
+        }
+
+        .data-table tbody tr:hover td {
+            background: var(--cds-layer-hover-01);
+        }
+
+        .data-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        .capacity-status {
+            display: inline-flex;
+            align-items: center;
+            min-height: 24px;
+            padding: 0 8px;
+            border-radius: 24px;
+            font-size: 0.75rem;
+            line-height: 1.33;
+            letter-spacing: 0.32px;
+            white-space: nowrap;
+        }
+
+        .capacity-status.enough {
+            background: rgba(36, 161, 72, 0.12);
+            color: var(--cds-support-success);
+        }
+
+        .capacity-status.not-enough {
+            background: rgba(218, 30, 40, 0.12);
+            color: var(--cds-support-error);
+        }
 
         .section-title { margin: 0 0 16px; font-size: 1.25rem; line-height: 1.4; font-weight: 400; color: var(--cds-text-primary); padding-left: 0; border-left: none; }
 
@@ -381,6 +466,41 @@
         .exceed-card-title { color: var(--cds-text-secondary); font-size: 0.75rem; line-height: 1.33; letter-spacing: 0.32px; text-transform: uppercase; }
         .exceed-card-value { margin-top: 8px; font-size: 2rem; line-height: 1.25; font-weight: 400; color: var(--cds-text-primary); }
         .exceed-card-label { margin-top: 4px; color: var(--cds-text-helper); font-size: 0.75rem; line-height: 1.33; letter-spacing: 0.32px; }
+
+        .sizing-legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            margin-top: 16px;
+            color: var(--cds-text-secondary);
+            font-size: 0.75rem;
+            line-height: 1.33;
+            letter-spacing: 0.32px;
+        }
+
+        .sizing-legend-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .sizing-legend-swatch {
+            width: 12px;
+            height: 12px;
+            display: inline-block;
+        }
+
+        .sizing-legend-swatch.actual {
+            background: rgba(15, 98, 254, 0.85);
+        }
+
+        .sizing-legend-swatch.exceed {
+            background: rgba(218, 30, 40, 0.85);
+        }
+
+        .sizing-legend-swatch.sizing {
+            background: var(--cds-support-warning);
+        }
 
         .hidden { display: none !important; }
 
@@ -454,6 +574,7 @@
         <div class="tabs">
             <button id="tabBtnMachine" class="tab-btn active" onclick="switchTab('machine')">Machine utilization</button>
             <button id="tabBtnLpar" class="tab-btn" onclick="switchTab('lpar')">LPAR utilization</button>
+            <button id="tabBtnCapacityPlanning" class="tab-btn" onclick="switchTab('capacityPlanning')">Capacity Planning</button>
         </div>
 
         <section id="machineSummary" class="summary-band">
@@ -574,6 +695,104 @@
             </div>
         </section>
 
+        <section id="capacityPlanningControls" class="control-band hidden">
+            <div class="band-header">
+                <div>
+                    <h2 class="band-title">Capacity planning controls</h2>
+                    <p class="band-description">Calculate a multi-year reference sizing independently from the Machine Utilization tab using the same capacity-planning method.</p>
+                </div>
+            </div>
+            <div class="controls">
+                <div class="field-group control-item"><label for="capacityPlanningMachineSelect">Select machine</label><select id="capacityPlanningMachineSelect" onchange="selectedCapacityPlanningPools.clear(); populateCapacityPlanningPoolCheckboxes()"></select></div>
+                <div class="field-group control-item"><label for="capacityPlanningMetricSelect">Capacity planning metric</label><select id="capacityPlanningMetricSelect">
+                    <option value="Max">Max capacity planning</option>
+                    <option value="p95">P95 capacity planning</option>
+                    <option value="p90">P90 capacity planning</option>
+                    <option value="p80">P80 capacity planning</option>
+                    <option value="p70">P70 capacity planning</option>
+                    <option value="p60">P60 capacity planning</option>
+                    <option value="p50">P50 capacity planning</option>
+                    <option value="Avg">Average capacity planning</option>
+                </select></div>
+                <div class="field-group control-item"><label for="capacityPlanningYearSelect">Number of years</label><select id="capacityPlanningYearSelect">
+                    <option value="1">1 year</option>
+                    <option value="2">2 years</option>
+                    <option value="3">3 years</option>
+                    <option value="4">4 years</option>
+                    <option value="5">5 years</option>
+                </select></div>
+                <div class="field-group control-item"><label for="capacityPlanningGrowthRate">Percent growth</label><input type="number" id="capacityPlanningGrowthRate" min="0" step="0.1" value="5"></div>
+                <div class="field-group control-item-wide">
+                    <label>CPU pools</label>
+                    <div id="capacityPlanningPoolCheckboxes" class="checkbox-group"></div>
+                    <div class="checkbox-actions" style="margin-top: 1rem;">
+                        <button class="primary-button" type="button" onclick="updateCapacityPlanningTable()">Calculate</button>
+                    </div>
+                </div>
+            </div>
+            <div class="band-header" style="margin-top: 2rem;">
+                <div>
+                    <h2 class="band-title">Capacity planning summary</h2>
+                    <p class="band-description">Review the base planning statistic, reference sizing for the selected horizon, and year-by-year headroom against projected actual peak usage.</p>
+                </div>
+            </div>
+            <div class="summary-dashboard" id="capacityPlanningSummaryCards">
+                <div class="stat-card" style="--accent: var(--cds-link-primary);"><h3>Base planning value</h3><div id="capacityPlanningBaseValue" class="stat-val">0.00</div><div class="stat-label">Year 1 capacity planning cores</div></div>
+                <div class="stat-card" style="--accent: var(--cds-support-warning);"><h3>Observed actual peak</h3><div id="capacityPlanningObservedPeak" class="stat-val">0.00</div><div class="stat-label">Year 1 actual peak cores</div></div>
+                <div class="stat-card" style="--accent: var(--cds-support-error);"><h3>Reference sizing</h3><div id="capacityPlanningReferenceSizing" class="stat-val">0</div><div class="stat-label">Rounded final-year cores</div></div>
+            </div>
+            <div class="table-stack">
+                <div>
+                    <div class="band-header" style="margin-bottom: 16px;">
+                        <div>
+                            <h3 class="band-title">Actual peak results</h3>
+                            <p class="band-description">Compare reference sizing against projected actual peak values.</p>
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table" id="capacityPlanningResultsTable">
+                            <thead>
+                                <tr>
+                                    <th>Year</th>
+                                    <th>Actual peak</th>
+                                    <th>Reference sizing</th>
+                                    <th>Status</th>
+                                    <th>Available %</th>
+                                </tr>
+                            </thead>
+                            <tbody id="capacityPlanningResultsBody">
+                                <tr><td colspan="5">Run capacity planning calculation to view yearly results.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div>
+                    <div class="band-header" style="margin: 0 0 16px;">
+                        <div>
+                            <h3 class="band-title">Capacity planning peak results</h3>
+                            <p class="band-description">Same output as the first table, using max capacity planning peak instead of actual peak.</p>
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table" id="capacityPlanningPeakResultsTable">
+                            <thead>
+                                <tr>
+                                    <th>Year</th>
+                                    <th>Max capacity planning peak</th>
+                                    <th>Reference sizing</th>
+                                    <th>Status</th>
+                                    <th>Available %</th>
+                                </tr>
+                            </thead>
+                            <tbody id="capacityPlanningPeakResultsBody">
+                                <tr><td colspan="5">Run capacity planning calculation to view capacity planning peak results.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
         <section class="chart-band">
             <div class="band-header">
                 <div>
@@ -587,7 +806,7 @@
 </div>
 
 <script>
-    let config = {}, lparData = {}, percentileMethod = 'INC', standbyValue = 0.1, intervalMinutes = 5, intervalsPerDay = 288, dateFormat = 'MM/DD/YYYY', allDates = new Set(), currentTab = 'machine', chart = null, selectedLpars = new Set(), selectedPools = new Set(), aggregationMode = 'capacity', startDateFilter = null, endDateFilter = null;
+    let config = {}, lparData = {}, percentileMethod = 'INC', standbyValue = 0.1, intervalMinutes = 5, intervalsPerDay = 288, dateFormat = 'MM/DD/YYYY', allDates = new Set(), currentTab = 'machine', chart = null, selectedLpars = new Set(), selectedPools = new Set(), selectedCapacityPlanningPools = new Set(), aggregationMode = 'capacity', startDateFilter = null, endDateFilter = null;
 
     function setTheme(theme) {
         const isDark = theme === 'dark';
@@ -726,8 +945,8 @@
         return s[l] * (1 - w) + s[u] * w;
     }
 
-    function getLparStats(lpar, date) {
-        const metric = document.getElementById('metricSelect').value;
+    function getLparStats(lpar, date, metricOverride = null) {
+        const metric = metricOverride || document.getElementById('metricSelect').value;
         if (!lparData[lpar] || !lparData[lpar][date]) return { intervals: Array(intervalsPerDay).fill(standbyValue), [metric]: standbyValue };
         const data = lparData[lpar][date]; let val = 0;
         if (metric === "Max") val = Math.max(...data.intervals);
@@ -738,8 +957,11 @@
 
     function updateSelectors() {
         const sortedDates = Array.from(allDates).sort((a, b) => new Date(a) - new Date(b));
-        const m1 = document.getElementById('machineSelect'), m2 = document.getElementById('lparMachineSelect');
-        m1.innerHTML = m2.innerHTML = Object.keys(config).map(m => `<option value="${m}">${m}</option>`).join('');
+        const m1 = document.getElementById('machineSelect'), m2 = document.getElementById('lparMachineSelect'), m3 = document.getElementById('capacityPlanningMachineSelect');
+        const machineOptions = Object.keys(config).map(m => `<option value="${m}">${m}</option>`).join('');
+        m1.innerHTML = machineOptions;
+        m2.innerHTML = machineOptions;
+        m3.innerHTML = machineOptions;
         
         // Set min/max for date pickers and default values based on available data
         if (sortedDates.length > 0) {
@@ -767,9 +989,12 @@
             // Set default: both start and end = oldest date (single day view)
             lparStartDateInput.value = minDate;
             lparEndDateInput.value = minDate;
+
         }
         
-        if (currentTab === 'machine') populatePoolCheckboxes(); else populateLparList();
+        if (currentTab === 'machine') populatePoolCheckboxes();
+        else if (currentTab === 'lpar') populateLparList();
+        else populateCapacityPlanningPoolCheckboxes();
     }
     
     function formatDateForInput(dateStr) {
@@ -815,11 +1040,16 @@
         currentTab = tab;
         document.getElementById('tabBtnMachine').classList.toggle('active', tab === 'machine');
         document.getElementById('tabBtnLpar').classList.toggle('active', tab === 'lpar');
+        document.getElementById('tabBtnCapacityPlanning').classList.toggle('active', tab === 'capacityPlanning');
         document.getElementById('machineControls').classList.toggle('hidden', tab !== 'machine');
         document.getElementById('machineSummary').classList.toggle('hidden', tab !== 'machine');
         document.getElementById('lparControls').classList.toggle('hidden', tab !== 'lpar');
         document.getElementById('lparSummary').classList.toggle('hidden', tab !== 'lpar');
-        if (tab === 'machine') populatePoolCheckboxes(); else populateLparList();
+        document.getElementById('capacityPlanningControls').classList.toggle('hidden', tab !== 'capacityPlanning');
+        document.querySelector('.chart-band').classList.toggle('hidden', tab === 'capacityPlanning');
+        if (tab === 'machine') populatePoolCheckboxes();
+        else if (tab === 'lpar') populateLparList();
+        else populateCapacityPlanningPoolCheckboxes();
     }
 
     function populatePoolCheckboxes() {
@@ -839,6 +1069,24 @@
             selectedPools.add(checkbox.value);
         } else {
             selectedPools.delete(checkbox.value);
+        }
+    }
+
+    function populateCapacityPlanningPoolCheckboxes() {
+        const m = document.getElementById('capacityPlanningMachineSelect').value, container = document.getElementById('capacityPlanningPoolCheckboxes');
+        if (!config[m]) return;
+        const pools = Object.keys(config[m]);
+        if (selectedCapacityPlanningPools.size === 0) {
+            pools.forEach(p => selectedCapacityPlanningPools.add(p));
+        }
+        container.innerHTML = pools.map(p => `<div class="checkbox-item"><input type="checkbox" ${selectedCapacityPlanningPools.has(p) ? 'checked' : ''} value="${p}" onchange="updateCapacityPlanningPoolSelection(this)"> <span>${p}</span></div>`).join('');
+    }
+
+    function updateCapacityPlanningPoolSelection(checkbox) {
+        if (checkbox.checked) {
+            selectedCapacityPlanningPools.add(checkbox.value);
+        } else {
+            selectedCapacityPlanningPools.delete(checkbox.value);
         }
     }
 
@@ -1042,6 +1290,102 @@
         initChart(labels, datasets, datesInRange.length > 1);
     }
 
+    function getCapacityMetricValue(intervals, metric) {
+        if (metric === 'Max') return Math.max(...intervals);
+        if (metric === 'Avg') return intervals.reduce((a, b) => a + b, 0) / intervals.length;
+        if (metric.startsWith('p')) return calculatePercentile(intervals, parseInt(metric.substring(1), 10) / 100);
+        return 0;
+    }
+
+    function getCapacityPlanningDailyValues(machine, pools, dates, metric) {
+        return dates.map(d => {
+            const poolCapacityValue = pools.reduce((sum, p) => {
+                return sum + config[machine][p].reduce((lparSum, l) => {
+                    const intervals = getLparStats(l, d, metric).intervals;
+                    return lparSum + getCapacityMetricValue(intervals, metric);
+                }, 0);
+            }, 0);
+
+            const combined = Array(intervalsPerDay).fill(0);
+            pools.forEach(p => {
+                config[machine][p].forEach(l => {
+                    const intervals = getLparStats(l, d, 'Max').intervals;
+                    intervals.forEach((v, i) => combined[i] += v);
+                });
+            });
+
+            return {
+                planning: poolCapacityValue,
+                actualPeak: Math.max(...combined)
+            };
+        });
+    }
+
+    function buildCapacityPlanningRows(comparisonValue, referenceSizing, years, growthRate) {
+        const rows = [];
+        for (let yearIndex = 1; yearIndex <= years; yearIndex++) {
+            const growthMultiplier = Math.pow(1 + growthRate, yearIndex - 1);
+            const yearComparisonValue = comparisonValue * growthMultiplier;
+            const availablePercent = referenceSizing > 0 ? ((referenceSizing - yearComparisonValue) / referenceSizing) * 100 : 0;
+            const isEnough = referenceSizing >= yearComparisonValue;
+
+            rows.push(`
+                <tr>
+                    <td>Year ${yearIndex}</td>
+                    <td>${yearComparisonValue.toFixed(2)}</td>
+                    <td>${referenceSizing.toFixed(0)}</td>
+                    <td><span class="capacity-status ${isEnough ? 'enough' : 'not-enough'}">${isEnough ? 'Enough' : 'Not enough'}</span></td>
+                    <td>${availablePercent.toFixed(2)}%</td>
+                </tr>
+            `);
+        }
+
+        return rows.join('');
+    }
+
+    function updateCapacityPlanningTable() {
+        const machine = document.getElementById('capacityPlanningMachineSelect').value;
+        const metric = document.getElementById('capacityPlanningMetricSelect').value;
+        const growthRate = (parseFloat(document.getElementById('capacityPlanningGrowthRate').value) || 0) / 100;
+        const years = parseInt(document.getElementById('capacityPlanningYearSelect').value, 10) || 1;
+        const pools = Array.from(document.querySelectorAll('#capacityPlanningPoolCheckboxes input:checked')).map(i => i.value);
+        const resultsBody = document.getElementById('capacityPlanningResultsBody');
+        const peakResultsBody = document.getElementById('capacityPlanningPeakResultsBody');
+
+        if (!config[machine] || !pools.length) {
+            document.getElementById('capacityPlanningBaseValue').innerText = '0.00';
+            document.getElementById('capacityPlanningObservedPeak').innerText = '0.00';
+            document.getElementById('capacityPlanningReferenceSizing').innerText = '0';
+            resultsBody.innerHTML = '<tr><td colspan="5">Select a machine and at least one CPU pool.</td></tr>';
+            peakResultsBody.innerHTML = '<tr><td colspan="5">Select a machine and at least one CPU pool.</td></tr>';
+            return;
+        }
+
+        const dates = Array.from(allDates).sort((a, b) => new Date(a) - new Date(b));
+        if (!dates.length) {
+            document.getElementById('capacityPlanningBaseValue').innerText = '0.00';
+            document.getElementById('capacityPlanningObservedPeak').innerText = '0.00';
+            document.getElementById('capacityPlanningReferenceSizing').innerText = '0';
+            resultsBody.innerHTML = '<tr><td colspan="5">No data available for capacity planning.</td></tr>';
+            peakResultsBody.innerHTML = '<tr><td colspan="5">No data available for capacity planning.</td></tr>';
+            return;
+        }
+
+        const dailyValues = getCapacityPlanningDailyValues(machine, pools, dates, metric);
+        const maxDailyValues = getCapacityPlanningDailyValues(machine, pools, dates, 'Max');
+        const basePlanningValue = dailyValues.length ? Math.max(...dailyValues.map(item => item.planning)) : 0;
+        const observedActualPeak = dailyValues.length ? Math.max(...dailyValues.map(item => item.actualPeak)) : 0;
+        const maxCapacityPlanningPeak = maxDailyValues.length ? Math.max(...maxDailyValues.map(item => item.planning)) : 0;
+        const referenceSizing = Math.ceil(basePlanningValue * Math.pow(1 + growthRate, Math.max(years - 1, 0)));
+
+        document.getElementById('capacityPlanningBaseValue').innerText = basePlanningValue.toFixed(2);
+        document.getElementById('capacityPlanningObservedPeak').innerText = observedActualPeak.toFixed(2);
+        document.getElementById('capacityPlanningReferenceSizing').innerText = referenceSizing.toLocaleString();
+
+        resultsBody.innerHTML = buildCapacityPlanningRows(observedActualPeak, referenceSizing, years, growthRate);
+        peakResultsBody.innerHTML = buildCapacityPlanningRows(maxCapacityPlanningPeak, referenceSizing, years, growthRate);
+    }
+
     function initChart(labels, datasets, isLparMultiDay = false) {
         if (chart) chart.destroy();
         
@@ -1063,7 +1407,7 @@
         }
         
         chart = new Chart(document.getElementById('cpuChart').getContext('2d'), {
-            type: currentTab === 'machine' ? 'bar' : 'line',
+            type: currentTab === 'lpar' ? 'line' : 'bar',
             data: { labels, datasets },
             options: {
                 responsive: true,

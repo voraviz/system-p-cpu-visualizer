@@ -7,6 +7,7 @@
   - [Features](#features)
     - [Machine Utilization View](#machine-utilization-view)
     - [LPAR Utilization View](#lpar-utilization-view)
+    - [Capacity Planning View](#capacity-planning-view)
   - [Aggregation Modes](#aggregation-modes)
     - [Capacity Planning (Sum of Metrics) - DEFAULT](#capacity-planning-sum-of-metrics---default)
     - [Actual Usage (Metric of Sums)](#actual-usage-metric-of-sums)
@@ -102,6 +103,18 @@ cpu-utilization-visualizer/
 -   **Interactive Tooltips:** Hover over data points to see detailed information including date, time, and CPU core values.
 -   **Combined View:** Aggregates and displays the utilization of multiple selected LPARs.
 -   **Summary Dashboard:** Provides detailed statistics calculated across all intervals in the selected date range, including Min, Max, Average, P50, P60, P70, P80, P90, and P95.
+
+### Capacity Planning View
+
+-   **Independent Planning Workflow:** Runs separately from the exceeded-capacity calculation in the Machine Utilization view while using the same capacity-planning calculation approach.
+-   **Metric Selection:** Choose Max, P95, P90, P80, P70, P60, P50, or Average capacity planning as the first-year planning baseline.
+-   **Growth Inputs:** Provide a growth rate and a planning duration from 1 to 5 years.
+-   **Reference Sizing Calculation:** Builds a final-year reference sizing by compounding growth from the first-year capacity planning value, then rounds the result up to the next whole core.
+-   **Projected Peak Comparison:** Applies the same annual growth rate to actual first-year peak usage for each year and compares that projected peak against the fixed reference sizing.
+-   **Dual Results Tables:** Shows two yearly output tables across the exact number of years selected by the user:
+    -   Table 1 compares projected **Actual peak** against **Reference sizing**
+    -   Table 2 compares projected **Max capacity planning peak** against **Reference sizing**
+-   **Availability Summary:** Shows base planning value, observed actual peak, reference sizing, yearly sizing sufficiency, and available percentage in Carbon-style result tables.
 
 ## Aggregation Modes
 
@@ -202,6 +215,7 @@ Recent interface updates in [visualizer.html](visualizer.html) include:
 - Optional dark theme based on the Gray 100 theme guidance in [design.md](design.md) and [design-dark.md](design-dark.md)
 - Segmented light/dark switch in the masthead
 - Refined summary cards and chart container styling for improved readability
+- Added a Capacity Planning tab for multi-year reference sizing and projected peak sufficiency analysis, including separate Actual peak and Max capacity planning peak result tables
 - Preserved original machine stacked-bar and LPAR line-chart color behavior for data clarity
 
 ## Screenshots
