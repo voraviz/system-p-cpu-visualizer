@@ -230,7 +230,7 @@ Recent interface updates in [visualizer.html](visualizer.html) include:
 
 ### Capacity Planning with Percentile
 
-![](images/exceed-percentile-planning.png)
+![](images/capacity-planning.png)
 
 ### Dark Mode
 
