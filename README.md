@@ -1,6 +1,7 @@
 # CPU Utilization Visualizer
 - [CPU Utilization Visualizer](#cpu-utilization-visualizer)
   - [Description](#description)
+  - [Disclaimer](#disclaimer)
   - [Development](#development)
   - [Project Structure](#project-structure)
   - [Features](#features)
@@ -13,10 +14,17 @@
     - [Example Scenario](#example-scenario)
     - [Configuration Example](#configuration-example)
     - [References](#references)
+  - [UI Updates](#ui-updates)
   - [Screenshots](#screenshots)
     - [Machine CPU Utilization (Sum by Pool)](#machine-cpu-utilization-sum-by-pool)
+      - [Overall](#overall)
+      - [Graph](#graph)
+      - [Select date range](#select-date-range)
     - [LPAR CPU Utilization (by Date)](#lpar-cpu-utilization-by-date)
-    - [Capacity Exceed Percentile Planning](#capacity-exceed-percentile-planning)
+      - [Overall](#overall-1)
+      - [Graph](#graph-1)
+    - [Capacity Planning with Percentile](#capacity-planning-with-percentile)
+    - [Dark Mode](#dark-mode)
   - [How to Use](#how-to-use)
   - [Data Formats](#data-formats)
     - [`config.ini`](#configini)
@@ -39,6 +47,10 @@
 A single-page web application designed for the visualization of historical CPU utilization data. Initially conceived for IBM Power Systems (Logical Partitions), this tool can be readily adapted to accommodate other virtualization platforms as well.
 
 The application facilitates the analysis of CPU usage patterns across multiple LPARs or Virtual Machines on physical hardware, organized by CPU Pools.
+
+## Disclaimer
+
+This application and repository are community-created utilities inspired by IBM design language for interface styling only. They are not official IBM software, products, services, or support offerings, and they are not affiliated with, endorsed by, or maintained by IBM.
 
 ## Development
 
@@ -182,28 +194,47 @@ INTERVAL=5
 - **Google Sheets Documentation:** [PERCENTILE function](https://support.google.com/docs/answer/3094114)
 - **Statistical Theory:** Hyndman, R.J. and Fan, Y. (1996). "Sample Quantiles in Statistical Packages", *The American Statistician*, 50(4), 361-365
 
+## UI Updates
+
+Recent interface updates in [visualizer.html](visualizer.html) include:
+
+- IBM Carbon-inspired light theme structure for layout, spacing, cards, inputs, tabs, and summaries
+- Optional dark theme based on the Gray 100 theme guidance in [design.md](design.md) and [design-dark.md](design-dark.md)
+- Segmented light/dark switch in the masthead
+- Refined summary cards and chart container styling for improved readability
+- Preserved original machine stacked-bar and LPAR line-chart color behavior for data clarity
+
 ## Screenshots
 
 ### Machine CPU Utilization (Sum by Pool)
+#### Overall
+![](images/machine01.png)
 
-![](images/machine.png)
+#### Graph
 
-Select date range
+![](images/machine02.png)
 
-![](images/machine-with-date-range.png)
+#### Select date range
+
+![](images/machine03.png)
 
 ### LPAR CPU Utilization (by Date)
 
+#### Overall
 
-![](images/lpar.png)
+![](images/lpar01.png)
 
-Select date range
+#### Graph
 
-![](images/lpar-with-date-range.png)
+![](images/lpar02.png)
 
-### Capacity Exceed Percentile Planning
+### Capacity Planning with Percentile
 
 ![](images/exceed-percentile-planning.png)
+
+### Dark Mode
+
+![](images/machine01-dark-mode.png)
 
 ## How to Use
 
