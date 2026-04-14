@@ -1541,15 +1541,20 @@
         dates.forEach((date) => {
             let dayHasExceed = false;
             
-            // Check each interval (5-minute period)
+            // Pre-fetch all LPAR intervals for this date to avoid repeated getLparStats calls
+            const lparIntervals = [];
+            pools.forEach(p => {
+                config[m][p].forEach(l => {
+                    lparIntervals.push(getLparStats(l, date).intervals);
+                });
+            });
+            
+            // Check each interval
             for (let intervalIdx = 0; intervalIdx < intervalsPerDay; intervalIdx++) {
-                // Sum actual usage across all LPARs in all pools for this interval
+                // Sum actual usage across all pre-fetched LPAR intervals
                 let intervalTotal = 0;
-                pools.forEach(p => {
-                    config[m][p].forEach(l => {
-                        const stats = getLparStats(l, date);
-                        intervalTotal += stats.intervals[intervalIdx];
-                    });
+                lparIntervals.forEach(intervals => {
+                    intervalTotal += intervals[intervalIdx];
                 });
                 
                 // Check if this interval exceeds the MAX capacity planning threshold
