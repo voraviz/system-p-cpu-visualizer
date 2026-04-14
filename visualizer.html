@@ -1589,7 +1589,7 @@
         const thresholdInfo = document.createElement('div');
         thresholdInfo.className = 'threshold-info';
         thresholdInfo.style.cssText = 'margin-top: 16px; padding: 16px; background: #f4f4f4; border-left: 2px solid #0f62fe; font-size: 12px; color: #525252; letter-spacing: 0.32px; line-height: 1.33;';
-        thresholdInfo.innerHTML = `<strong>Max Capacity Planning Threshold (${met.toUpperCase()}):</strong> ${maxCapacityPlanning.toFixed(2)} cores<br><small>Occurred on: ${maxCapacityDate}</small>`;
+        thresholdInfo.innerHTML = `<strong>Max Capacity Planning Threshold (${met.toUpperCase()}):</strong> ${maxCapacityPlanning.toFixed(2)} cores<br><small>Actual peak occured on: ${maxCapacityDate}</small>`;
         resultsDiv.appendChild(thresholdInfo);
         
         resultsDiv.classList.remove('hidden');
