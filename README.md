@@ -243,12 +243,22 @@ Recent interface updates in [visualizer.html](visualizer.html) include:
 ![](images/lpar02.png)
 
 ### Capacity Planning with Percentile
+- Input
 
-![](images/exceed-percentile-planning.png)
+![](images/capacity-planning-01.png)
+
+- Result
+  - Reference sizing vs Actual peak
+    
+    ![](images/capacity-planning-02.png)
+
+  - Reference sizing vs sum of peak
+    
+    ![](images/capacity-planning-03.png)
 
 ### Dark Mode
 
-![](images/machine-dark.png)
+![](images/machine01-dark-mode.png)
 
 ## How to Use
 
