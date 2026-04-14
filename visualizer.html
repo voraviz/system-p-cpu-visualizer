@@ -784,10 +784,12 @@
                                     <th>Reference sizing</th>
                                     <th>Status</th>
                                     <th>% Available</th>
+                                    <th>Exceed Minutes/year</th>
+                                    <th>Exceed Cores/year</th>
                                 </tr>
                             </thead>
                             <tbody id="capacityPlanningPeakResultsBody">
-                                <tr><td colspan="5">Run capacity planning calculation to view capacity planning peak results.</td></tr>
+                                <tr><td colspan="7">Run capacity planning calculation to view capacity planning peak results.</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -1347,7 +1349,7 @@
         return rows.join('');
     }
 
-    function calculateAnnualizedActualExceedance(machine, pools, referenceSizing, growthRate, years, dates) {
+    function calculateAnnualizedActualExceedance(machine, pools, referenceSizing, growthRate, years, dates, valueType = 'actual') {
         const sampledDayCount = dates.length || 0;
         if (!sampledDayCount) {
             return Array.from({ length: years }, () => ({ minutes: 0, cores: 0 }));
@@ -1357,30 +1359,48 @@
 
         return Array.from({ length: years }, (_, yearIndex) => {
             const growthMultiplier = Math.pow(1 + growthRate, yearIndex);
-            let totalExceededIntervals = 0;
+            let totalExceededMinutes = 0;
             let totalExceededCores = 0;
 
             dates.forEach(d => {
                 const combined = Array(intervalsPerDay).fill(0);
+                const perLparMaxValues = [];
+
                 pools.forEach(p => {
                     config[machine][p].forEach(l => {
                         const intervals = getLparStats(l, d).intervals;
+                        let lparMax = 0;
+
                         intervals.forEach((v, i) => {
-                            combined[i] += v * growthMultiplier;
+                            combined[i] += v;
+                            if (v > lparMax) {
+                                lparMax = v;
+                            }
                         });
+
+                        perLparMaxValues.push(lparMax);
                     });
                 });
 
-                combined.forEach(value => {
-                    if (value > referenceSizing) {
-                        totalExceededIntervals += 1;
-                        totalExceededCores += value - referenceSizing;
+                if (valueType === 'actual') {
+                    combined.forEach(value => {
+                        const projectedValue = value * growthMultiplier;
+                        if (projectedValue > referenceSizing) {
+                            totalExceededMinutes += intervalMinutes;
+                            totalExceededCores += projectedValue - referenceSizing;
+                        }
+                    });
+                } else {
+                    const projectedSumOfMax = perLparMaxValues.reduce((sum, value) => sum + value, 0) * growthMultiplier;
+                    if (projectedSumOfMax > referenceSizing) {
+                        totalExceededMinutes += 24 * 60;
+                        totalExceededCores += projectedSumOfMax - referenceSizing;
                     }
-                });
+                }
             });
 
             return {
-                minutes: totalExceededIntervals * intervalMinutes * annualizationFactor,
+                minutes: totalExceededMinutes * annualizationFactor,
                 cores: totalExceededCores * annualizationFactor
             };
         });
@@ -1400,7 +1420,7 @@
             document.getElementById('capacityPlanningObservedPeak').innerText = '0.00';
             document.getElementById('capacityPlanningReferenceSizing').innerText = '0';
             resultsBody.innerHTML = '<tr><td colspan="7">Select a machine and at least one CPU pool.</td></tr>';
-            peakResultsBody.innerHTML = '<tr><td colspan="5">Select a machine and at least one CPU pool.</td></tr>';
+            peakResultsBody.innerHTML = '<tr><td colspan="7">Select a machine and at least one CPU pool.</td></tr>';
             return;
         }
 
@@ -1410,7 +1430,7 @@
             document.getElementById('capacityPlanningObservedPeak').innerText = '0.00';
             document.getElementById('capacityPlanningReferenceSizing').innerText = '0';
             resultsBody.innerHTML = '<tr><td colspan="7">No data available for capacity planning.</td></tr>';
-            peakResultsBody.innerHTML = '<tr><td colspan="5">No data available for capacity planning.</td></tr>';
+            peakResultsBody.innerHTML = '<tr><td colspan="7">No data available for capacity planning.</td></tr>';
             return;
         }
 
@@ -1425,10 +1445,11 @@
         document.getElementById('capacityPlanningObservedPeak').innerText = observedActualPeak.toFixed(2);
         document.getElementById('capacityPlanningReferenceSizing').innerText = referenceSizing.toLocaleString();
 
-        const annualizedActualExceedance = calculateAnnualizedActualExceedance(machine, pools, referenceSizing, growthRate, years, dates);
+        const annualizedActualExceedance = calculateAnnualizedActualExceedance(machine, pools, referenceSizing, growthRate, years, dates, 'actual');
+        const annualizedMaxExceedance = calculateAnnualizedActualExceedance(machine, pools, referenceSizing, growthRate, years, dates, 'max');
 
         resultsBody.innerHTML = buildCapacityPlanningRows(observedActualPeak, referenceSizing, years, growthRate, annualizedActualExceedance);
-        peakResultsBody.innerHTML = buildCapacityPlanningRows(maxCapacityPlanningPeak, referenceSizing, years, growthRate);
+        peakResultsBody.innerHTML = buildCapacityPlanningRows(maxCapacityPlanningPeak, referenceSizing, years, growthRate, annualizedMaxExceedance);
     }
 
     function initChart(labels, datasets, isLparMultiDay = false) {

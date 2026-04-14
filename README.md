@@ -111,9 +111,9 @@ cpu-utilization-visualizer/
 -   **Growth Inputs:** Provide a growth rate and a planning duration from 1 to 5 years, and the results render the same number of yearly rows as the selected duration.
 -   **Reference Sizing Calculation:** Builds a fixed final-year reference sizing by compounding growth from the first-year capacity planning value, then rounds the result up to the next whole core.
 -   **Dual Results Tables:** Shows two yearly output tables:
-    -   Table 1 compares projected **Actual peak** against **Reference sizing** and adds `Minutes/year` plus `Cores/year` only when status is `Not enough`
-    -   Table 2 compares projected **Sum of Max** against **Reference sizing**
--   **Annualized Exceedance Projection:** `Minutes/year` and `Cores/year` use the same combined-interval method as the Machine Utilization view and interpolate sampled exceedance to a 360-day year.
+    -   *Max of Sum* compares projected **Actual peak** against **Reference sizing** and adds `Exceed Minutes/year` plus `Exceed Cores/year` only when status is `Not enough`
+    -   *Sum of Max* compares projected **Sum of Max** against **Reference sizing** and also adds `Exceed Minutes/year` plus `Exceed Cores/year`
+-   **Annualized Exceedance Projection:** `Exceed Minutes/year` and `Exceed Cores/year` are annualized to a 360-day year. Table 1 uses the combined-interval actual-usage method from Machine Utilization, while Table 2 uses the projected daily **Sum of Max** value for each sampled day before annualizing the exceedance.
 -   **Availability Summary:** Shows base planning value, observed actual peak, reference sizing, yearly sizing sufficiency, and available percentage in Carbon-style result tables.
 
 ## Aggregation Modes
