@@ -255,38 +255,23 @@ Recent interface updates in [visualizer.html](visualizer.html) include:
 ### Machine CPU Utilization (Sum by Pool)
 #### Overall
 
-![](images/machine01.png)
+![](images/machine-utilization-01.png)
 
 #### Graph
 
-![](images/machine02.png)
+![](images/machine-utilization-02.png)
 
 ### LPAR CPU Utilization (by Date)
 
-![](images/lpar01.png)
-
-#### Graph
-
-![](images/lpar02.png)
+![](images/lpar-utilization.png)
 
 ### Capacity Planning with Percentile
 
-- Input
-
-![](images/capacity-planning-01.png)
-
-- Result
-  - Reference sizing vs Actual peak
-    
-    ![](images/capacity-planning-02.png)
-
-  - Reference sizing vs sum of peak
-    
-    ![](images/capacity-planning-03.png)
+![](images/capacity-planning.png)
 
 ### Dark Mode
 
-![](images/machine01-dark-mode.png)
+![](images/dark-mode.png)
 
 ## How to Use
 
