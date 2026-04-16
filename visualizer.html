@@ -1481,12 +1481,12 @@
                 interaction: { mode: 'index', intersect: false },
                 scales: {
                     x: {
-                        stacked: currentTab === 'machine',
+                        stacked: currentTab === 'machine' || currentTab === 'lpar',
                         grid: { color: getComputedStyle(document.body).getPropertyValue('--cds-chart-grid').trim(), drawBorder: false },
                         ticks: { color: getComputedStyle(document.body).getPropertyValue('--cds-text-secondary').trim(), maxRotation: 0, autoSkip: true }
                     },
                     y: {
-                        stacked: currentTab === 'machine',
+                        stacked: currentTab === 'machine' || currentTab === 'lpar',
                         title: { display: true, text: 'Cores', color: getComputedStyle(document.body).getPropertyValue('--cds-text-secondary').trim() },
                         grid: { color: getComputedStyle(document.body).getPropertyValue('--cds-chart-grid').trim(), drawBorder: false },
                         ticks: { color: getComputedStyle(document.body).getPropertyValue('--cds-text-secondary').trim() }
