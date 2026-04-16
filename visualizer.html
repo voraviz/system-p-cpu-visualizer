@@ -705,8 +705,8 @@
                 </div>
             </div>
             <div class="controls">
-                <div class="field-group control-item"><label for="capacityPlanningMachineSelect">Select machine</label><select id="capacityPlanningMachineSelect" onchange="selectedCapacityPlanningPools.clear(); populateCapacityPlanningPoolCheckboxes()"></select></div>
-                <div class="field-group control-item"><label for="capacityPlanningMetricSelect">Capacity planning metric</label><select id="capacityPlanningMetricSelect">
+                <div class="field-group control-item"><label for="capacityPlanningMachineSelect">Select machine</label><select id="capacityPlanningMachineSelect" onchange="selectedCapacityPlanningPools.clear(); populateCapacityPlanningPoolCheckboxes(); resetCapacityPlanningResults()"></select></div>
+                <div class="field-group control-item"><label for="capacityPlanningMetricSelect">Capacity planning metric</label><select id="capacityPlanningMetricSelect" onchange="resetCapacityPlanningResults()">
                     <option value="Max">Max - Sum of metrics</option>
                     <option value="MaxDifferentDay">Max - Sum of metrics from different day</option>
                     <option value="p95">P95 - Sum of metrics</option>
@@ -718,14 +718,14 @@
                     <option value="p50">P50 capacity planning</option>
                     <option value="Avg">Average capacity planning</option>
                 </select></div>
-                <div class="field-group control-item"><label for="capacityPlanningYearSelect">Number of years</label><select id="capacityPlanningYearSelect">
+                <div class="field-group control-item"><label for="capacityPlanningYearSelect">Number of years</label><select id="capacityPlanningYearSelect" onchange="resetCapacityPlanningResults()">
                     <option value="1">1 year</option>
                     <option value="2">2 years</option>
                     <option value="3">3 years</option>
                     <option value="4">4 years</option>
                     <option value="5">5 years</option>
                 </select></div>
-                <div class="field-group control-item"><label for="capacityPlanningGrowthRate">Percent growth</label><input type="number" id="capacityPlanningGrowthRate" min="0" step="0.1" value="5"></div>
+                <div class="field-group control-item"><label for="capacityPlanningGrowthRate">Percent growth</label><input type="number" id="capacityPlanningGrowthRate" min="0" step="0.1" value="5" onchange="resetCapacityPlanningResults()" oninput="resetCapacityPlanningResults()"></div>
                 <div class="field-group control-item-wide">
                     <label>CPU pools</label>
                     <div id="capacityPlanningPoolCheckboxes" class="checkbox-group"></div>
@@ -794,32 +794,6 @@
                             </thead>
                             <tbody id="capacityPlanningPeakResultsBody">
                                 <tr><td colspan="7">Run capacity planning calculation to view capacity planning peak results.</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-                <div>
-                    <div class="band-header" style="margin: 0 0 16px;">
-                        <div>
-                            <h3 class="band-title">Capacity planning results (different day)</h3>
-                            <p class="band-description">Compare reference sizing against the sum of each pool's independent best day, allowing peaks to come from different days and different intervals.</p>
-                        </div>
-                    </div>
-                    <div class="table-container">
-                        <table class="data-table" id="capacityPlanningDifferentDayResultsTable">
-                            <thead>
-                                <tr>
-                                    <th>Year</th>
-                                    <th>Sum of Max (different day)</th>
-                                    <th>Reference sizing</th>
-                                    <th>Status</th>
-                                    <th>% Available</th>
-                                    <th>Exceed Minutes/year</th>
-                                    <th>Exceed Cores/year</th>
-                                </tr>
-                            </thead>
-                            <tbody id="capacityPlanningDifferentDayResultsBody">
-                                <tr><td colspan="7">Run capacity planning calculation to view different-day capacity planning results.</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -1113,7 +1087,7 @@
         if (selectedCapacityPlanningPools.size === 0) {
             pools.forEach(p => selectedCapacityPlanningPools.add(p));
         }
-        container.innerHTML = pools.map(p => `<div class="checkbox-item"><input type="checkbox" ${selectedCapacityPlanningPools.has(p) ? 'checked' : ''} value="${p}" onchange="updateCapacityPlanningPoolSelection(this)"> <span>${p}</span></div>`).join('');
+        container.innerHTML = pools.map(p => `<div class="checkbox-item"><input type="checkbox" ${selectedCapacityPlanningPools.has(p) ? 'checked' : ''} value="${p}" onchange="updateCapacityPlanningPoolSelection(this); resetCapacityPlanningResults()"> <span>${p}</span></div>`).join('');
     }
 
     function updateCapacityPlanningPoolSelection(checkbox) {
@@ -1544,6 +1518,14 @@
         });
     }
 
+    function resetCapacityPlanningResults() {
+        document.getElementById('capacityPlanningBaseValue').innerText = '0.00';
+        document.getElementById('capacityPlanningObservedPeak').innerText = '0.00';
+        document.getElementById('capacityPlanningReferenceSizing').innerText = '0';
+        document.getElementById('capacityPlanningResultsBody').innerHTML = '<tr><td colspan="7">Update inputs and click Calculate to view yearly results.</td></tr>';
+        document.getElementById('capacityPlanningPeakResultsBody').innerHTML = '<tr><td colspan="7">Update inputs and click Calculate to view capacity planning peak results.</td></tr>';
+    }
+
     function updateCapacityPlanningTable() {
         const machine = document.getElementById('capacityPlanningMachineSelect').value;
         const metric = document.getElementById('capacityPlanningMetricSelect').value;
@@ -1552,7 +1534,6 @@
         const pools = Array.from(document.querySelectorAll('#capacityPlanningPoolCheckboxes input:checked')).map(i => i.value);
         const resultsBody = document.getElementById('capacityPlanningResultsBody');
         const peakResultsBody = document.getElementById('capacityPlanningPeakResultsBody');
-        const differentDayResultsBody = document.getElementById('capacityPlanningDifferentDayResultsBody');
 
         if (!config[machine] || !pools.length) {
             document.getElementById('capacityPlanningBaseValue').innerText = '0.00';
@@ -1560,7 +1541,6 @@
             document.getElementById('capacityPlanningReferenceSizing').innerText = '0';
             resultsBody.innerHTML = '<tr><td colspan="7">Select a machine and at least one CPU pool.</td></tr>';
             peakResultsBody.innerHTML = '<tr><td colspan="7">Select a machine and at least one CPU pool.</td></tr>';
-            differentDayResultsBody.innerHTML = '<tr><td colspan="7">Select a machine and at least one CPU pool.</td></tr>';
             return;
         }
 
@@ -1571,17 +1551,14 @@
             document.getElementById('capacityPlanningReferenceSizing').innerText = '0';
             resultsBody.innerHTML = '<tr><td colspan="7">No data available for capacity planning.</td></tr>';
             peakResultsBody.innerHTML = '<tr><td colspan="7">No data available for capacity planning.</td></tr>';
-            differentDayResultsBody.innerHTML = '<tr><td colspan="7">No data available for capacity planning.</td></tr>';
             return;
         }
 
         const dailyValues = getCapacityPlanningDailyValues(machine, pools, dates, metric);
         const sameDayMaxDailyValues = getCapacityPlanningDailyValues(machine, pools, dates, 'Max');
-        const differentDayMaxDailyValues = getCapacityPlanningDailyValues(machine, pools, dates, 'MaxDifferentDay');
         const basePlanningValue = dailyValues.length ? Math.max(...dailyValues.map(item => item.planning)) : 0;
         const observedActualPeak = dailyValues.length ? Math.max(...dailyValues.map(item => item.actualPeak)) : 0;
         const maxCapacityPlanningPeak = sameDayMaxDailyValues.length ? Math.max(...sameDayMaxDailyValues.map(item => item.planning)) : 0;
-        const maxCapacityPlanningDifferentDayPeak = differentDayMaxDailyValues.length ? Math.max(...differentDayMaxDailyValues.map(item => item.planning)) : 0;
         const referenceSizing = Math.ceil(basePlanningValue * Math.pow(1 + growthRate, Math.max(years - 1, 0)));
 
         document.getElementById('capacityPlanningBaseValue').innerText = basePlanningValue.toFixed(2);
@@ -1590,11 +1567,9 @@
 
         const annualizedActualExceedance = calculateAnnualizedActualExceedance(machine, pools, referenceSizing, growthRate, years, dates, 'actual');
         const annualizedMaxExceedance = calculateAnnualizedActualExceedance(machine, pools, referenceSizing, growthRate, years, dates, 'max');
-        const annualizedDifferentDayMaxExceedance = buildCapacityPlanningRows(maxCapacityPlanningDifferentDayPeak, referenceSizing, years, growthRate, annualizedMaxExceedance);
 
         resultsBody.innerHTML = buildCapacityPlanningRows(observedActualPeak, referenceSizing, years, growthRate, annualizedActualExceedance);
         peakResultsBody.innerHTML = buildCapacityPlanningRows(maxCapacityPlanningPeak, referenceSizing, years, growthRate, annualizedMaxExceedance);
-        differentDayResultsBody.innerHTML = annualizedDifferentDayMaxExceedance;
     }
 
     function initChart(labels, datasets, isLparMultiDay = false) {
