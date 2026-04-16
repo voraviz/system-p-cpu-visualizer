@@ -291,14 +291,15 @@ Example:
 
 ```ini
 [MAIN]
-PERCENTILE=INC
-STANDBY=0.1
-INTERVAL=5
-DATE_FORMAT=MM/DD/YYYY
-
-[MACHINE1]
-POOL_A=lpar1,lpar2
-POOL_B=lpar3
+PERCENTILE=INC # or EXC
+INTERVAL=5 # minutes
+DATEFORMAT=MM/DD/YYYY # Supported formats: MM/DD/YYYY, DD/MM/YYYY, YYYY-MM-DD, YYYY/MM/DD, MM-DD-YYYY, DD-MM-YYYY
+[APOLLO] # Machine
+APP_POOL1=LPAR1,LPAR3 #POOL = LPAR1,...
+DB_POOL1=LPAR5
+[ARTEMIS]
+APP_POOL2=LPAR2,LPAR4
+DB_POOL2=LPAR6
 ```
 
 ### CSV Performance Data
@@ -306,10 +307,9 @@ POOL_B=lpar3
 Expected CSV columns:
 - `date`
 - `time`
-- `lpar`
-- `cpu`
+- `interval`
 
-Each CSV should contain 5-minute interval CPU data for a single LPAR.
+Each CSV should contain interval CPU data for a single LPAR (VM) this interval can be configured in ini file
 
 ### Supported Date Formats
 
@@ -340,33 +340,131 @@ Use [`generate_cpu_data.py`](generate_cpu_data.py) to create sample datasets for
 
 ### Overview
 
-The app supports two percentile methods:
-- `INC` for inclusive percentile calculation
-- `EXC` for exclusive percentile calculation
+The app supports two percentile methods configured by `PERCENTILE=INC|EXC` in [`config.ini`](README.md:298):
+
+- `INC` = inclusive percentile calculation
+- `EXC` = exclusive percentile calculation
+
+Both methods first sort the interval values from lowest to highest, then locate the percentile position, and finally use linear interpolation when the percentile falls between two points.
+
+### How interpolation works
+
+Percentiles often land between two actual samples rather than exactly on one of them. When that happens, the app calculates a weighted value between the lower and upper neighbors.
+
+This is implemented in [`calculatePercentile()`](visualizer.html:945):
+
+1. Sort the values
+2. Compute the percentile index
+3. Find the lower and upper sample positions
+4. Interpolate between them using the fractional distance
+
+In code terms:
+
+- the lower index is [`Math.floor(i)`](visualizer.html:950)
+- the upper index is [`Math.ceil(i)`](visualizer.html:950)
+- the fractional part is [`w = i - l`](visualizer.html:950)
+- the result is [`s[l] * (1 - w) + s[u] * w`](visualizer.html:951)
+
+Example:
+
+If the sorted values are `[10, 20, 30, 40]` and the percentile position lands halfway between `20` and `30`, the result is:
+
+- `20 * 0.5 + 30 * 0.5 = 25`
+
+So the returned percentile does not need to be one of the original observed values.
 
 ### PERCENTILE.INC (Inclusive Method)
 
-Matches Excel/Google Sheets inclusive percentile behavior.
+`INC` uses the inclusive rank formula:
+
+- index = `(n - 1) * p`
+
+This matches the behavior in [`calculatePercentile()`](visualizer.html:948) when `percentileMethod !== 'EXC'`.
+
+Meaning:
+
+- `p = 0` maps to the first value
+- `p = 1` maps to the last value
+- the minimum and maximum are included as valid percentile endpoints
+
+This is why `INC` is usually easier to understand in operational dashboards and why it aligns with common spreadsheet expectations.
 
 ### PERCENTILE.EXC (Exclusive Method)
 
-Provides the exclusive percentile calculation variant often used in statistics.
+`EXC` uses the exclusive rank formula:
+
+- index = `(n + 1) * p - 1`
+
+This matches the behavior in [`calculatePercentile()`](visualizer.html:948) when `percentileMethod === 'EXC'`.
+
+Meaning:
+
+- the percentile is positioned as if the endpoints are outside the main percentile range
+- very low and very high percentiles are pushed farther inward
+- with small samples, `EXC` can produce more aggressive interpolation near the ends
+
+In strict statistical usage, this can be preferred because it avoids treating the minimum and maximum as full percentile anchors in the same way as `INC`.
+
+### Key difference between INC and EXC
+
+The two methods differ only in how they compute the percentile position before interpolation.
+
+For the same sorted data:
+
+- `INC` tends to stay closer to the endpoints
+- `EXC` tends to move percentile positions inward
+- the difference becomes more noticeable when:
+  - the sample size is small
+  - you use extreme percentiles such as `P90`, `P95`, or higher
+  - values near the top or bottom are far apart
+
+For large datasets, the difference is usually smaller.
 
 ### Comparison Table
 
-| Method | Compatible With | Behavior |
-|--------|------------------|----------|
-| `INC` | Excel / Google Sheets default | Includes endpoints |
-| `EXC` | Statistical workflows | Excludes endpoints |
+| Method | Rank Formula | Endpoint Behavior | Best Fit |
+|--------|--------------|-------------------|----------|
+| `INC` | `(n - 1) * p` | Includes minimum and maximum as percentile endpoints | Excel/Google Sheets style analysis |
+| `EXC` | `(n + 1) * p - 1` | Pushes percentile positions inward from the endpoints | Statistical or stricter sampling workflows |
 
 ### Which Method to Choose?
 
-- Use `INC` when you want spreadsheet-compatible results.
-- Use `EXC` when you need stricter statistical behavior.
+- Use `INC` when you want spreadsheet-compatible results and intuitive business reporting.
+- Use `EXC` when you want percentile positions that are less anchored to the absolute minimum and maximum.
+- For CPU planning, `INC` is often easier to validate against Excel.
+- For analytical comparison with statistical tooling, `EXC` may be preferable.
 
 ### Practical Example with CPU Data
 
-If combined interval values are `[10, 12, 14, 18, 20]`:
-- `P50` gives the median
-- `P90` gives a near-peak planning threshold
-- Choice of `INC` vs `EXC` slightly changes the percentile output
+If combined interval values are `[10, 12, 14, 18, 20]`, then `n = 5`.
+
+For `P90`:
+
+#### Using `INC`
+
+- index = `(5 - 1) * 0.90 = 3.6`
+- lower value = `18`
+- upper value = `20`
+- result = `18 * 0.4 + 20 * 0.6 = 19.2`
+
+#### Using `EXC`
+
+- index = `(5 + 1) * 0.90 - 1 = 4.4`
+- this lands above the last usable interval pair, so the implementation returns the last value
+- result = `20`
+
+So for the same data:
+
+- `P90 INC = 19.2`
+- `P90 EXC = 20`
+
+This shows why `EXC` can produce a higher near-peak threshold in a small dataset.
+
+### Practical interpretation for CPU utilization
+
+- `P50` is the median typical load
+- `P80` or `P90` is often useful for planning thresholds
+- `P95` is closer to a near-worst-case operating envelope
+- the selected percentile method changes the threshold slightly, especially for small daily samples or very spiky workloads
+
+When comparing results with external tools, always make sure they use the same percentile method as the app.
