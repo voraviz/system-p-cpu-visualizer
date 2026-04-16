@@ -589,13 +589,13 @@
                     <h3 id="minLabel">Machine min</h3>
                     <div id="statMinDate" class="stat-date">-</div>
                     <div id="statMin" class="stat-val">0.00</div>
-                    <div class="stat-label">Cores</div>
+                    <div id="statMinLabel" class="stat-label">Cores</div>
                 </div>
                 <div class="stat-card" style="--accent: var(--cds-support-error);">
                     <h3 id="maxLabel">Machine max</h3>
                     <div id="statMaxDate" class="stat-date">-</div>
                     <div id="statMax" class="stat-val">0.00</div>
-                    <div class="stat-label">Cores</div>
+                    <div id="statMaxLabel" class="stat-label">Cores</div>
                 </div>
             </div>
             <div style="margin-top: 24px;">
@@ -1206,13 +1206,18 @@
         const modeLabel = aggregationMode === 'capacity' ? 'Sum of' : 'Of Sums';
         const poolPerformanceDescription = document.getElementById('poolPerformanceDescription');
         if (aggregationMode === 'capacity') {
-            // Capacity Planning: Date is misleading since we sum metrics from different times
-            document.getElementById('statMinDate').innerText = 'Multiple Dates';
-            document.getElementById('statMaxDate').innerText = 'Multiple Dates';
+            // Capacity Planning: Values come from a single day, but may combine different intervals
+            const capacityTimingLabel = 'Single day, multiple intervals';
+            document.getElementById('statMinDate').innerText = capacityTimingLabel;
+            document.getElementById('statMaxDate').innerText = capacityTimingLabel;
+            document.getElementById('statMinLabel').innerText = dates[machineDaily.indexOf(mMin)] || '-';
+            document.getElementById('statMaxLabel').innerText = dates[machineDaily.indexOf(mMax)] || '-';
             if (poolPerformanceDescription) {
                 poolPerformanceDescription.innerText = 'LPAR maximum can come from different intervals within the same day.';
             }
         } else {
+            document.getElementById('statMinLabel').innerText = 'Cores';
+            document.getElementById('statMaxLabel').innerText = 'Cores';
             // Actual Usage: Date/time is meaningful since it's the simultaneous peak moment
             const formatIntervalTime = (index) => {
                 const intervalsPerHour = 60 / intervalMinutes;
