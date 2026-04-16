@@ -649,9 +649,7 @@
                 <div class="field-group control-item-wide">
                     <label>CPU pools</label>
                     <div id="poolCheckboxes" class="checkbox-group"></div>
-                    <div class="checkbox-actions">
-                        <button id="calculateExceedBtn" class="button-secondary hidden" onclick="calculateP90Exceed()">Calculate capacity exceed statistics</button>
-                    </div>
+                    <div class="checkbox-actions"></div>
                 </div>
             </div>
 
@@ -1124,10 +1122,8 @@
         const dates = getFilteredDates();
         const poolContainer = document.getElementById('poolBreakdown'); poolContainer.innerHTML = "";
         
-        // Show/hide P90 exceed button based on metric and aggregation mode
-        const showP90Button = met.startsWith('p') && aggregationMode === 'capacity';
-        document.getElementById('calculateExceedBtn').classList.toggle('hidden', !showP90Button);
-        document.getElementById('exceedResults').classList.add('hidden');
+        const shouldShowExceedResults = met.startsWith('p') && (aggregationMode === 'capacity' || aggregationMode === 'capacityDifferentDay');
+        document.getElementById('exceedResults').classList.toggle('hidden', !shouldShowExceedResults);
         document.querySelector('.chart-band').classList.toggle('hidden', currentTab === 'machine' && aggregationMode === 'capacityDifferentDay');
         
         if (!config[m] || dates.length === 0 || pools.length === 0) return;
@@ -1267,6 +1263,13 @@
         
         document.getElementById('minLabel').innerText = `MACHINE MIN (${met.toUpperCase()} - ${modeLabel})`;
         document.getElementById('maxLabel').innerText = `MACHINE MAX (${met.toUpperCase()} - ${modeLabel})`;
+        if (shouldShowExceedResults) {
+            calculatePercentileExceedStats();
+        } else {
+            const resultsDiv = document.getElementById('exceedResults');
+            const existingThreshold = resultsDiv.querySelector('.threshold-info');
+            if (existingThreshold) existingThreshold.remove();
+        }
         if (aggregationMode === 'capacityDifferentDay') {
             if (chart) {
                 chart.destroy();
@@ -1623,34 +1626,46 @@
         });
     }
 
-    function calculateP90Exceed() {
+    function calculatePercentileExceedStats() {
         const m = document.getElementById('machineSelect').value;
         const met = document.getElementById('metricSelect').value;
         const pools = Array.from(document.querySelectorAll('#poolCheckboxes input:checked')).map(i => i.value);
         const dates = getFilteredDates();
         
-        if (!config[m] || dates.length === 0 || pools.length === 0 || aggregationMode !== 'capacity') {
-            alert('Please ensure you are in Capacity Planning mode with a percentile metric selected.');
+        if (!config[m] || dates.length === 0 || pools.length === 0 || !met.startsWith('p') || (aggregationMode !== 'capacity' && aggregationMode !== 'capacityDifferentDay')) {
             return;
         }
         
-        // Get the percentile value from the selected metric (e.g., "p90" -> 0.90)
-        const percentileValue = met.startsWith('p') ? parseInt(met.substring(1)) / 100 : 0.90;
+        const percentileValue = parseInt(met.substring(1)) / 100;
+        let maxCapacityPlanning = 0;
+        let maxCapacityDate = '';
         
-        // Calculate capacity planning value for each date (sum of each LPAR's percentile)
-        const capacityPlanningValues = dates.map(d => {
-            return pools.reduce((sum, p) => {
-                return sum + config[m][p].reduce((lparSum, l) => {
-                    const stats = getLparStats(l, d);
-                    const percentile = calculatePercentile(stats.intervals, percentileValue);
-                    return lparSum + percentile;
+        if (aggregationMode === 'capacity') {
+            const capacityPlanningValues = dates.map(d => {
+                return pools.reduce((sum, p) => {
+                    return sum + config[m][p].reduce((lparSum, l) => {
+                        const stats = getLparStats(l, d);
+                        const percentile = calculatePercentile(stats.intervals, percentileValue);
+                        return lparSum + percentile;
+                    }, 0);
                 }, 0);
+            });
+            maxCapacityPlanning = Math.max(...capacityPlanningValues);
+            maxCapacityDate = dates[capacityPlanningValues.indexOf(maxCapacityPlanning)];
+        } else {
+            maxCapacityPlanning = pools.reduce((sum, p) => {
+                const poolDailyValues = dates.map(d => {
+                    return config[m][p].reduce((lparSum, l) => {
+                        const stats = getLparStats(l, d);
+                        const percentile = calculatePercentile(stats.intervals, percentileValue);
+                        return lparSum + percentile;
+                    }, 0);
+                });
+                const poolMax = poolDailyValues.length ? Math.max(...poolDailyValues) : 0;
+                return sum + poolMax;
             }, 0);
-        });
-        
-        // Find the MAXIMUM capacity planning value across all dates
-        const maxCapacityPlanning = Math.max(...capacityPlanningValues);
-        const maxCapacityDate = dates[capacityPlanningValues.indexOf(maxCapacityPlanning)];
+            maxCapacityDate = 'Different days by pool';
+        }
         
         let totalMinutesExceed = 0;
         let daysWithExceed = 0;
@@ -1714,7 +1729,7 @@
         const thresholdInfo = document.createElement('div');
         thresholdInfo.className = 'threshold-info';
         thresholdInfo.style.cssText = 'margin-top: 16px; padding: 16px; background: #f4f4f4; border-left: 2px solid #0f62fe; font-size: 12px; color: #525252; letter-spacing: 0.32px; line-height: 1.33;';
-        thresholdInfo.innerHTML = `<strong>Max Capacity Planning Threshold (${met.toUpperCase()}):</strong> ${maxCapacityPlanning.toFixed(2)} cores<br><small>Actual peak occured on: ${maxCapacityDate}</small>`;
+        thresholdInfo.innerHTML = `<strong>Max Capacity Planning Threshold (${met.toUpperCase()}):</strong> ${maxCapacityPlanning.toFixed(2)} cores<br><small>Threshold timing: ${maxCapacityDate}</small>`;
         resultsDiv.appendChild(thresholdInfo);
         
         resultsDiv.classList.remove('hidden');

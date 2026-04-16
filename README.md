@@ -21,10 +21,7 @@
     - [Machine CPU Utilization (Sum by Pool)](#machine-cpu-utilization-sum-by-pool)
       - [Overall](#overall)
       - [Graph](#graph)
-      - [Select date range](#select-date-range)
     - [LPAR CPU Utilization (by Date)](#lpar-cpu-utilization-by-date)
-      - [Overall](#overall-1)
-      - [Graph](#graph-1)
     - [Capacity Planning with Percentile](#capacity-planning-with-percentile)
     - [Dark Mode](#dark-mode)
   - [How to Use](#how-to-use)
@@ -108,7 +105,7 @@ cpu-utilization-visualizer/
 ### Capacity Planning View
 
 -   **Independent Planning Workflow:** Runs separately from the exceeded-capacity calculation in the Machine Utilization view while reusing the same combined-interval capacity-planning logic.
--   **Metric Selection:** Choose paired same-day and different-day planning metrics for Max, P95, P90, and P80 as the first-year planning baseline.
+-   **Metric Selection:** Choose paired same-day and different-day planning metrics for Max, P95, P90, and P80, plus single-mode P50 and Average, as the first-year planning baseline.
 -   **Growth Inputs:** Provide a growth rate and a planning duration from 1 to 5 years, and the results render the same number of yearly rows as the selected duration.
 -   **Reference Sizing Calculation:** Builds a fixed final-year reference sizing by compounding growth from the first-year capacity planning value, then rounds the result up to the next whole core.
 -   **Dual Results Tables:** Shows two yearly output tables:
@@ -221,11 +218,7 @@ The Machine Utilization view offers three distinct calculation methods to serve 
 - Interpretation: "I want a sizing envelope based on independent pool best days"
 - Best for: Comparing a more conservative planning scenario against the same-day assumption
 
-**Important Note:** The values in Machine Utilization [`Actual Usage`](README.md:124) mode will match the stacked LPAR Utilization view when all LPARs are selected for the same date, as both calculate the metric from combined intervals.
-- Interpretation: "I want a sizing envelope based on independent pool best days"
-- Best for: Comparing a more conservative planning scenario against the same-day assumption
-
-**Important Note:** The values in Machine Utilization [`Actual Usage`](README.md:143) mode will match the stacked LPAR Utilization view when all LPARs are selected for the same date, as both calculate the metric from combined intervals.
+**Important Note:** The values in Machine Utilization `Actual Usage` mode will match the stacked LPAR Utilization view when all LPARs are selected for the same date, as both calculate the metric from combined intervals.
 
 ### Configuration Example
 
@@ -251,7 +244,7 @@ Recent interface updates in [visualizer.html](visualizer.html) include:
 - Optional dark theme based on the Gray 100 theme guidance in [design.md](design.md) and [design-dark.md](design-dark.md)
 - Segmented light/dark switch in the masthead
 - Refined summary cards, comparison tables, and chart container styling for improved readability
-- Added a Capacity Planning tab for multi-year reference sizing and projected peak sufficiency analysis, now with three result tables covering actual peak, same-day sum-of-max, and different-day sum-of-max
+- Added a Capacity Planning tab for multi-year reference sizing and projected peak sufficiency analysis with separate yearly results for actual peak and same-day sum-of-max comparisons
 - Added a third Machine Utilization aggregation mode for `Capacity Planning (sum of metrics from different day)` and hides the machine chart for that mode
 - Updated Machine Utilization summary labels to distinguish `Single day, multiple intervals` from simultaneous peaks
 - Updated LPAR visualization to stacked rendering so the visible chart top matches the combined summary total
@@ -261,19 +254,14 @@ Recent interface updates in [visualizer.html](visualizer.html) include:
 
 ### Machine CPU Utilization (Sum by Pool)
 #### Overall
+
 ![](images/machine01.png)
 
 #### Graph
 
 ![](images/machine02.png)
 
-#### Select date range
-
-![](images/machine03.png)
-
 ### LPAR CPU Utilization (by Date)
-
-#### Overall
 
 ![](images/lpar01.png)
 
@@ -282,6 +270,7 @@ Recent interface updates in [visualizer.html](visualizer.html) include:
 ![](images/lpar02.png)
 
 ### Capacity Planning with Percentile
+
 - Input
 
 ![](images/capacity-planning-01.png)
