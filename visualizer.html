@@ -600,6 +600,7 @@
             </div>
             <div style="margin-top: 24px;">
                 <div class="section-title">Individual pool performance</div>
+                <p class="band-description" id="poolPerformanceDescription">LPAR maximum can come from different intervals within the same day.</p>
                 <div id="poolBreakdown" class="pool-breakdown"></div>
             </div>
         </section>
@@ -1148,10 +1149,32 @@
             }
             const minV = Math.min(...daily), maxV = Math.max(...daily);
             const minD = dates[daily.indexOf(minV)], maxD = dates[daily.indexOf(maxV)];
+            const formatIntervalTime = (index) => {
+                const intervalsPerHour = 60 / intervalMinutes;
+                const hour = Math.floor(index / intervalsPerHour);
+                const minute = (index % intervalsPerHour) * intervalMinutes;
+                return `${hour}:${minute.toString().padStart(2, '0')}`;
+            };
+            let minDisplayDate = minD;
+            let maxDisplayDate = maxD;
+            if (aggregationMode === 'actual') {
+                const getPoolCombinedIntervalsForDate = (date) => {
+                    const combined = Array(intervalsPerDay).fill(0);
+                    config[m][p].forEach(l => {
+                        const intervals = getLparStats(l, date).intervals;
+                        intervals.forEach((v, i) => combined[i] += v);
+                    });
+                    return combined;
+                };
+                const minIntervals = getPoolCombinedIntervalsForDate(minD);
+                const maxIntervals = getPoolCombinedIntervalsForDate(maxD);
+                minDisplayDate = `${minD} ${formatIntervalTime(minIntervals.indexOf(Math.min(...minIntervals)))}`;
+                maxDisplayDate = `${maxD} ${formatIntervalTime(maxIntervals.indexOf(Math.max(...maxIntervals)))}`;
+            }
             const card = document.createElement('div'); card.className = 'pool-card';
             card.innerHTML = `<h4>Pool: ${p}</h4><div class="pool-stat-grid">
-                <div><div class="pool-sub-label">Min</div><div class="pool-sub-val">${minV.toFixed(2)}</div><div class="pool-sub-date">${minD}</div></div>
-                <div><div class="pool-sub-label">Max</div><div class="pool-sub-val">${maxV.toFixed(2)}</div><div class="pool-sub-date">${maxD}</div></div></div>`;
+                <div><div class="pool-sub-label">Min</div><div class="pool-sub-val">${minV.toFixed(2)}</div><div class="pool-sub-date">${minDisplayDate}</div></div>
+                <div><div class="pool-sub-label">Max</div><div class="pool-sub-val">${maxV.toFixed(2)}</div><div class="pool-sub-date">${maxDisplayDate}</div></div></div>`;
             poolContainer.appendChild(card);
             return { label: p, backgroundColor: getMachineChartColor(idx), data: daily };
         });
@@ -1181,14 +1204,43 @@
         document.getElementById('statMax').innerText = mMax.toFixed(2);
         
         const modeLabel = aggregationMode === 'capacity' ? 'Sum of' : 'Of Sums';
+        const poolPerformanceDescription = document.getElementById('poolPerformanceDescription');
         if (aggregationMode === 'capacity') {
             // Capacity Planning: Date is misleading since we sum metrics from different times
             document.getElementById('statMinDate').innerText = 'Multiple Dates';
             document.getElementById('statMaxDate').innerText = 'Multiple Dates';
+            if (poolPerformanceDescription) {
+                poolPerformanceDescription.innerText = 'LPAR maximum can come from different intervals within the same day.';
+            }
         } else {
-            // Actual Usage: Date is meaningful since it's the actual peak moment
-            document.getElementById('statMinDate').innerText = dates[machineDaily.indexOf(mMin)];
-            document.getElementById('statMaxDate').innerText = dates[machineDaily.indexOf(mMax)];
+            // Actual Usage: Date/time is meaningful since it's the simultaneous peak moment
+            const formatIntervalTime = (index) => {
+                const intervalsPerHour = 60 / intervalMinutes;
+                const hour = Math.floor(index / intervalsPerHour);
+                const minute = (index % intervalsPerHour) * intervalMinutes;
+                return `${hour}:${minute.toString().padStart(2, '0')}`;
+            };
+            const machineMinDate = dates[machineDaily.indexOf(mMin)];
+            const machineMaxDate = dates[machineDaily.indexOf(mMax)];
+            const getCombinedIntervalsForDate = (date) => {
+                const combined = Array(intervalsPerDay).fill(0);
+                pools.forEach(p => {
+                    config[m][p].forEach(l => {
+                        const intervals = getLparStats(l, date).intervals;
+                        intervals.forEach((v, i) => combined[i] += v);
+                    });
+                });
+                return combined;
+            };
+            const minIntervals = getCombinedIntervalsForDate(machineMinDate);
+            const maxIntervals = getCombinedIntervalsForDate(machineMaxDate);
+            const minTime = formatIntervalTime(minIntervals.indexOf(Math.min(...minIntervals)));
+            const maxTime = formatIntervalTime(maxIntervals.indexOf(Math.max(...maxIntervals)));
+            document.getElementById('statMinDate').innerText = `${machineMinDate} ${minTime}`;
+            document.getElementById('statMaxDate').innerText = `${machineMaxDate} ${maxTime}`;
+            if (poolPerformanceDescription) {
+                poolPerformanceDescription.innerText = 'Simultaneous peak within the day.';
+            }
         }
         
         document.getElementById('minLabel').innerText = `MACHINE MIN (${met.toUpperCase()} - ${modeLabel})`;
