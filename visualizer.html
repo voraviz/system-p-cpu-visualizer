@@ -838,7 +838,15 @@
         const text = await e.target.files[0].text(), lines = text.split(/\r?\n/);
         let currentSection = '';
         lines.forEach(line => {
-            line = line.trim(); if (!line || line.startsWith(';') || line.startsWith('#')) return;
+            line = line.trim();
+            // Remove inline comments (everything after #)
+            const commentIndex = line.indexOf('#');
+            if (commentIndex !== -1) {
+                line = line.substring(0, commentIndex).trim();
+            }
+            // Skip empty lines or lines that are now empty after removing comments
+            if (!line || line.startsWith(';')) return;
+            
             if (line.startsWith('[') && line.endsWith(']')) {
                 currentSection = line.substring(1, line.length - 1).toUpperCase();
                 if (currentSection !== 'MAIN') config[currentSection] = {};
@@ -1444,7 +1452,9 @@
             return Array.from({ length: years }, () => ({ minutes: 0, cores: 0 }));
         }
 
-        const annualizationFactor = 360 / sampledDayCount;
+        // Only annualize if we have less than a full year of data
+        // If we have 360+ days, no adjustment needed (factor = 1.0)
+        const annualizationFactor = sampledDayCount >= 360 ? 1.0 : 360 / sampledDayCount;
 
         return Array.from({ length: years }, (_, yearIndex) => {
             const growthMultiplier = Math.pow(1 + growthRate, yearIndex);

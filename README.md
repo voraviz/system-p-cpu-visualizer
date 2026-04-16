@@ -60,7 +60,9 @@ The project is designed to be self-contained within `visualizer.html`, making it
 ```
 cpu-utilization-visualizer/
 ├── visualizer.html           # Main application file
+├── analyze_exceedance.py     # Python script for capacity planning analysis
 ├── config.ini                # Machine and CPU Pool configuration
+├── analyzer.ini              # Configuration for analyze_exceedance.py
 ├── generate_cpu_data.py      # Create sample data for testing
 ├── data/                     # Sample of CSV files containing CPU utilization data
 │   ├── lpar1.csv
@@ -317,6 +319,56 @@ Supported formats are controlled by `DATE_FORMAT` in `config.ini`, including:
 - `MM/DD/YYYY`
 - `DD/MM/YYYY`
 - `YYYY-MM-DD`
+
+## Capacity Planning Analysis Script
+
+### analyze_exceedance.py
+
+A Python script for detailed capacity planning analysis that generates CSV reports of capacity exceedances.
+
+**Features:**
+- Command-line tool with INI file configuration
+- Analyzes CPU capacity exceedances year by year
+- Generates detailed CSV reports for each year
+- Supports inline comments in INI files (everything after `#` is ignored)
+- Handles full-year and partial-year data correctly
+- Configurable growth rate, planning years, and reference sizing
+
+**Usage:**
+```bash
+python3 analyze_exceedance.py <config_file.ini>
+```
+
+**Example:**
+```bash
+python3 analyze_exceedance.py analyzer.ini
+```
+
+**Configuration File (analyzer.ini):**
+```ini
+[MAIN]
+PERCENTILE=INC          # or EXC
+STANDBY=0.1            # Standby LPAR value in cores
+INTERVAL=5             # Interval in minutes
+DATA_DIR=data-internal # Directory containing CSV files
+PERCENT_GROWTH=5       # Growth rate percentage per year
+NUM_OF_YEAR=5          # Number of years to analyze
+REFERENCE_CORE=47      # Reference sizing in cores
+
+[P780#1]               # Machine name
+IST1=UP2SWPD1,UP2SWPD2,UP2SWPD5
+WASND1=UP2UIPD1
+DEFAULT1=UP2DNPD1,UP2WSPD1,UP2DDPD1
+```
+
+**Output:**
+- Console: Year-by-year summary with raw and annualized values
+- CSV files: `exceedances_year1.csv` through `exceedances_yearN.csv`
+- Each CSV contains: machine, lpar, date, time, reference_core, actual_core, exceed_core
+
+**Annualization Logic:**
+- If data has ≥360 days: No adjustment (factor = 1.0)
+- If data has <360 days: Scales up to 360 days (factor = 360/sampled_days)
 
 ## Example Data Generation (Python)
 
