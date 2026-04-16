@@ -639,9 +639,10 @@
                     <option value="p80">P80</option><option value="p70">P70</option><option value="p60">P60</option>
                     <option value="p50">P50</option><option value="Avg">Average</option>
                 </select></div>
-                <div class="field-group control-item"><label for="aggregationModeSelect">Aggregation mode</label><select id="aggregationModeSelect" onchange="aggregationMode = this.value; updateMachineChart()" title="Capacity Planning: Sum each LPAR's metric (for sizing). Actual Usage: Calculate metric from combined intervals (real peak).">
-                    <option value="capacity">Capacity planning (sum of metrics)</option>
+                <div class="field-group control-item"><label for="aggregationModeSelect">Aggregation mode</label><select id="aggregationModeSelect" onchange="aggregationMode = this.value; updateMachineChart()" title="Capacity Planning: Sum each LPAR's metric within the same day. Actual Usage: Calculate metric from combined intervals (real peak). Capacity Planning (different day): Sum each pool's best metric across different days.">
                     <option value="actual">Actual usage (metric of sums)</option>
+                    <option value="capacity">Capacity planning (sum of metrics)</option>
+                    <option value="capacityDifferentDay">Capacity Planning (sum of metrics from different day)</option>
                 </select></div>
                 <div class="field-group control-item"><label for="startDateSelect">Start date</label><input type="date" id="startDateSelect" onchange="updateMachineChart()" title="Select start date for data range (leave empty for all dates)"></div>
                 <div class="field-group control-item"><label for="endDateSelect">End date</label><input type="date" id="endDateSelect" onchange="updateMachineChart()" title="Select end date for data range (leave empty for all dates)"></div>
@@ -706,12 +707,14 @@
             <div class="controls">
                 <div class="field-group control-item"><label for="capacityPlanningMachineSelect">Select machine</label><select id="capacityPlanningMachineSelect" onchange="selectedCapacityPlanningPools.clear(); populateCapacityPlanningPoolCheckboxes()"></select></div>
                 <div class="field-group control-item"><label for="capacityPlanningMetricSelect">Capacity planning metric</label><select id="capacityPlanningMetricSelect">
-                    <option value="Max">Max capacity planning</option>
-                    <option value="p95">P95 capacity planning</option>
-                    <option value="p90">P90 capacity planning</option>
-                    <option value="p80">P80 capacity planning</option>
-                    <option value="p70">P70 capacity planning</option>
-                    <option value="p60">P60 capacity planning</option>
+                    <option value="Max">Max - Sum of metrics</option>
+                    <option value="MaxDifferentDay">Max - Sum of metrics from different day</option>
+                    <option value="p95">P95 - Sum of metrics</option>
+                    <option value="p95DifferentDay">P95 - Sum of metrics from different day</option>
+                    <option value="p90">P90 - Sum of metrics</option>
+                    <option value="p90DifferentDay">P90 - Sum of metrics from different day</option>
+                    <option value="p80">P80 - Sum of metrics</option>
+                    <option value="p80DifferentDay">P80 - Sum of metrics from different day</option>
                     <option value="p50">P50 capacity planning</option>
                     <option value="Avg">Average capacity planning</option>
                 </select></div>
@@ -746,8 +749,8 @@
                 <div>
                     <div class="band-header" style="margin-bottom: 16px;">
                         <div>
-                            <h3 class="band-title">Actual peak results</h3>
-                            <p class="band-description">Compare reference sizing against projected actual peak values.</p>
+                            <h3 class="band-title">Actual peak results (same interval)</h3>
+                            <p class="band-description">Compare reference sizing against projected simultaneous machine peaks where all selected LPAR intervals are summed at the same timestamp.</p>
                         </div>
                     </div>
                     <div class="table-container">
@@ -772,8 +775,8 @@
                 <div>
                     <div class="band-header" style="margin: 0 0 16px;">
                         <div>
-                            <h3 class="band-title">Capacity planning peak results</h3>
-                            <p class="band-description">Same output as the first table, using max capacity planning peak instead of actual peak.</p>
+                            <h3 class="band-title">Capacity planning results (same day, different intervals)</h3>
+                            <p class="band-description">Compare reference sizing against the highest same-day sum of per-LPAR metrics, where each LPAR can peak at a different interval within that day.</p>
                         </div>
                     </div>
                     <div class="table-container">
@@ -781,7 +784,7 @@
                             <thead>
                                 <tr>
                                     <th>Year</th>
-                                    <th>Sum of Max</th>
+                                    <th>Sum of Max (same day)</th>
                                     <th>Reference sizing</th>
                                     <th>Status</th>
                                     <th>% Available</th>
@@ -791,6 +794,32 @@
                             </thead>
                             <tbody id="capacityPlanningPeakResultsBody">
                                 <tr><td colspan="7">Run capacity planning calculation to view capacity planning peak results.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div>
+                    <div class="band-header" style="margin: 0 0 16px;">
+                        <div>
+                            <h3 class="band-title">Capacity planning results (different day)</h3>
+                            <p class="band-description">Compare reference sizing against the sum of each pool's independent best day, allowing peaks to come from different days and different intervals.</p>
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table" id="capacityPlanningDifferentDayResultsTable">
+                            <thead>
+                                <tr>
+                                    <th>Year</th>
+                                    <th>Sum of Max (different day)</th>
+                                    <th>Reference sizing</th>
+                                    <th>Status</th>
+                                    <th>% Available</th>
+                                    <th>Exceed Minutes/year</th>
+                                    <th>Exceed Cores/year</th>
+                                </tr>
+                            </thead>
+                            <tbody id="capacityPlanningDifferentDayResultsBody">
+                                <tr><td colspan="7">Run capacity planning calculation to view different-day capacity planning results.</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -1125,12 +1154,13 @@
         const showP90Button = met.startsWith('p') && aggregationMode === 'capacity';
         document.getElementById('calculateExceedBtn').classList.toggle('hidden', !showP90Button);
         document.getElementById('exceedResults').classList.add('hidden');
+        document.querySelector('.chart-band').classList.toggle('hidden', currentTab === 'machine' && aggregationMode === 'capacityDifferentDay');
         
         if (!config[m] || dates.length === 0 || pools.length === 0) return;
 
         const datasets = pools.map((p, idx) => {
             let daily;
-            if (aggregationMode === 'capacity') {
+            if (aggregationMode === 'capacity' || aggregationMode === 'capacityDifferentDay') {
                 // Capacity Planning: Sum of individual LPAR metrics
                 daily = dates.map(d => config[m][p].reduce((s, l) => s + getLparStats(l, d)[met], 0));
             } else {
@@ -1183,6 +1213,11 @@
         if (aggregationMode === 'capacity') {
             // Sum pool values for each date
             machineDaily = dates.map(d => pools.reduce((s, p) => s + datasets[pools.indexOf(p)].data[dates.indexOf(d)], 0));
+        } else if (aggregationMode === 'capacityDifferentDay') {
+            // Sum each pool's independent daily values; machine min/max become sum of pool min/max across different days
+            const poolMinSum = datasets.reduce((sum, dataset) => sum + Math.min(...dataset.data), 0);
+            const poolMaxSum = datasets.reduce((sum, dataset) => sum + Math.max(...dataset.data), 0);
+            machineDaily = [poolMinSum, poolMaxSum];
         } else {
             // Actual Usage: Combine all LPARs across all pools, then calculate metric
             machineDaily = dates.map(d => {
@@ -1203,7 +1238,7 @@
         document.getElementById('statMin').innerText = mMin.toFixed(2);
         document.getElementById('statMax').innerText = mMax.toFixed(2);
         
-        const modeLabel = aggregationMode === 'capacity' ? 'Sum of' : 'Of Sums';
+        const modeLabel = aggregationMode === 'actual' ? 'Of Sums' : 'Sum of';
         const poolPerformanceDescription = document.getElementById('poolPerformanceDescription');
         if (aggregationMode === 'capacity') {
             // Capacity Planning: Values come from a single day, but may combine different intervals
@@ -1214,6 +1249,14 @@
             document.getElementById('statMaxLabel').innerText = dates[machineDaily.indexOf(mMax)] || '-';
             if (poolPerformanceDescription) {
                 poolPerformanceDescription.innerText = 'LPAR maximum can come from different intervals within the same day.';
+            }
+        } else if (aggregationMode === 'capacityDifferentDay') {
+            document.getElementById('statMinDate').innerText = 'Different days by pool';
+            document.getElementById('statMaxDate').innerText = 'Different days by pool';
+            document.getElementById('statMinLabel').innerText = 'Independent pool minima';
+            document.getElementById('statMaxLabel').innerText = 'Independent pool maxima';
+            if (poolPerformanceDescription) {
+                poolPerformanceDescription.innerText = 'Pool maximum can come from different days and different intervals.';
             }
         } else {
             document.getElementById('statMinLabel').innerText = 'Cores';
@@ -1250,6 +1293,13 @@
         
         document.getElementById('minLabel').innerText = `MACHINE MIN (${met.toUpperCase()} - ${modeLabel})`;
         document.getElementById('maxLabel').innerText = `MACHINE MAX (${met.toUpperCase()} - ${modeLabel})`;
+        if (aggregationMode === 'capacityDifferentDay') {
+            if (chart) {
+                chart.destroy();
+                chart = null;
+            }
+            return;
+        }
         initChart(dates, datasets);
     }
 
@@ -1359,11 +1409,42 @@
     }
 
     function getCapacityPlanningDailyValues(machine, pools, dates, metric) {
+        const isDifferentDayMetric = metric.endsWith('DifferentDay');
+        const baseMetric = isDifferentDayMetric ? metric.replace('DifferentDay', '') : metric;
+
+        if (isDifferentDayMetric) {
+            const planning = pools.reduce((sum, p) => {
+                const poolDailyValues = dates.map(d => {
+                    return config[machine][p].reduce((lparSum, l) => {
+                        const intervals = getLparStats(l, d, baseMetric).intervals;
+                        return lparSum + getCapacityMetricValue(intervals, baseMetric);
+                    }, 0);
+                });
+                return sum + (poolDailyValues.length ? Math.max(...poolDailyValues) : 0);
+            }, 0);
+
+            const observedActualPeak = dates.reduce((peak, d) => {
+                const combined = Array(intervalsPerDay).fill(0);
+                pools.forEach(p => {
+                    config[machine][p].forEach(l => {
+                        const intervals = getLparStats(l, d, 'Max').intervals;
+                        intervals.forEach((v, i) => combined[i] += v);
+                    });
+                });
+                return Math.max(peak, Math.max(...combined));
+            }, 0);
+
+            return [{
+                planning,
+                actualPeak: observedActualPeak
+            }];
+        }
+
         return dates.map(d => {
             const poolCapacityValue = pools.reduce((sum, p) => {
                 return sum + config[machine][p].reduce((lparSum, l) => {
-                    const intervals = getLparStats(l, d, metric).intervals;
-                    return lparSum + getCapacityMetricValue(intervals, metric);
+                    const intervals = getLparStats(l, d, baseMetric).intervals;
+                    return lparSum + getCapacityMetricValue(intervals, baseMetric);
                 }, 0);
             }, 0);
 
@@ -1471,6 +1552,7 @@
         const pools = Array.from(document.querySelectorAll('#capacityPlanningPoolCheckboxes input:checked')).map(i => i.value);
         const resultsBody = document.getElementById('capacityPlanningResultsBody');
         const peakResultsBody = document.getElementById('capacityPlanningPeakResultsBody');
+        const differentDayResultsBody = document.getElementById('capacityPlanningDifferentDayResultsBody');
 
         if (!config[machine] || !pools.length) {
             document.getElementById('capacityPlanningBaseValue').innerText = '0.00';
@@ -1478,6 +1560,7 @@
             document.getElementById('capacityPlanningReferenceSizing').innerText = '0';
             resultsBody.innerHTML = '<tr><td colspan="7">Select a machine and at least one CPU pool.</td></tr>';
             peakResultsBody.innerHTML = '<tr><td colspan="7">Select a machine and at least one CPU pool.</td></tr>';
+            differentDayResultsBody.innerHTML = '<tr><td colspan="7">Select a machine and at least one CPU pool.</td></tr>';
             return;
         }
 
@@ -1488,14 +1571,17 @@
             document.getElementById('capacityPlanningReferenceSizing').innerText = '0';
             resultsBody.innerHTML = '<tr><td colspan="7">No data available for capacity planning.</td></tr>';
             peakResultsBody.innerHTML = '<tr><td colspan="7">No data available for capacity planning.</td></tr>';
+            differentDayResultsBody.innerHTML = '<tr><td colspan="7">No data available for capacity planning.</td></tr>';
             return;
         }
 
         const dailyValues = getCapacityPlanningDailyValues(machine, pools, dates, metric);
-        const maxDailyValues = getCapacityPlanningDailyValues(machine, pools, dates, 'Max');
+        const sameDayMaxDailyValues = getCapacityPlanningDailyValues(machine, pools, dates, 'Max');
+        const differentDayMaxDailyValues = getCapacityPlanningDailyValues(machine, pools, dates, 'MaxDifferentDay');
         const basePlanningValue = dailyValues.length ? Math.max(...dailyValues.map(item => item.planning)) : 0;
         const observedActualPeak = dailyValues.length ? Math.max(...dailyValues.map(item => item.actualPeak)) : 0;
-        const maxCapacityPlanningPeak = maxDailyValues.length ? Math.max(...maxDailyValues.map(item => item.planning)) : 0;
+        const maxCapacityPlanningPeak = sameDayMaxDailyValues.length ? Math.max(...sameDayMaxDailyValues.map(item => item.planning)) : 0;
+        const maxCapacityPlanningDifferentDayPeak = differentDayMaxDailyValues.length ? Math.max(...differentDayMaxDailyValues.map(item => item.planning)) : 0;
         const referenceSizing = Math.ceil(basePlanningValue * Math.pow(1 + growthRate, Math.max(years - 1, 0)));
 
         document.getElementById('capacityPlanningBaseValue').innerText = basePlanningValue.toFixed(2);
@@ -1504,9 +1590,11 @@
 
         const annualizedActualExceedance = calculateAnnualizedActualExceedance(machine, pools, referenceSizing, growthRate, years, dates, 'actual');
         const annualizedMaxExceedance = calculateAnnualizedActualExceedance(machine, pools, referenceSizing, growthRate, years, dates, 'max');
+        const annualizedDifferentDayMaxExceedance = buildCapacityPlanningRows(maxCapacityPlanningDifferentDayPeak, referenceSizing, years, growthRate, annualizedMaxExceedance);
 
         resultsBody.innerHTML = buildCapacityPlanningRows(observedActualPeak, referenceSizing, years, growthRate, annualizedActualExceedance);
         peakResultsBody.innerHTML = buildCapacityPlanningRows(maxCapacityPlanningPeak, referenceSizing, years, growthRate, annualizedMaxExceedance);
+        differentDayResultsBody.innerHTML = annualizedDifferentDayMaxExceedance;
     }
 
     function initChart(labels, datasets, isLparMultiDay = false) {

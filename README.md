@@ -9,8 +9,9 @@
     - [LPAR Utilization View](#lpar-utilization-view)
     - [Capacity Planning View](#capacity-planning-view)
   - [Aggregation Modes](#aggregation-modes)
-    - [Capacity Planning (Sum of Metrics) - DEFAULT](#capacity-planning-sum-of-metrics---default)
     - [Actual Usage (Metric of Sums)](#actual-usage-metric-of-sums)
+    - [Capacity Planning (Sum of Metrics)](#capacity-planning-sum-of-metrics)
+    - [Capacity Planning (Sum of Metrics from Different Day)](#capacity-planning-sum-of-metrics-from-different-day)
     - [Key Differences](#key-differences)
     - [Example Scenario](#example-scenario)
     - [Configuration Example](#configuration-example)
@@ -86,7 +87,7 @@ cpu-utilization-visualizer/
 -   **Stacked Bar Chart:** Visualizes daily CPU utilization for a selected machine, stacked by CPU pool.
 -   **Date Range Selection:** Filter data by selecting start and end dates using calendar widgets. Default shows full date range (oldest to newest date).
 -   **Metric Selection:** Choose between Max, Average, or various Percentiles (P50, P60, P70, P80, P90, P95) for daily aggregation.
--   **Aggregation Mode:** Select between two calculation methods (see [Aggregation Modes](#aggregation-modes) below).
+-   **Aggregation Mode:** Select between Actual Usage, Capacity Planning (same day), and Capacity Planning (different day) calculation methods (see [Aggregation Modes](#aggregation-modes) below).
 -   **Pool Toggling:** Dynamically show/hide individual CPU pools on the chart.
 -   **Summary Dashboard:** Displays the minimum and maximum total daily CPU cores across the selected date range for the chosen machine and metric, along with per-pool min/max statistics.
 -   **Capacity Exceed Statistics:** When using percentile metrics with Capacity Planning mode, calculate and display statistics for intervals where actual usage exceeds the maximum capacity planning threshold:
@@ -97,7 +98,7 @@ cpu-utilization-visualizer/
 
 ### LPAR Utilization View
 
--   **Stacked Line Chart:** Shows CPU utilization for selected LPARs with 5-minute interval granularity.
+-   **Stacked Line Chart:** Shows CPU utilization for selected LPARs with 5-minute interval granularity, stacked so the visible top boundary matches the combined total shown in the summary.
 -   **Date Range Selection:** Analyze single or multiple days using start and end date pickers. Default shows oldest date (single day view).
 -   **Sequential Multi-Day View:** When multiple dates are selected, displays continuous data from 00:00 of the first day to 23:55 of the last day.
 -   **Interactive Tooltips:** Hover over data points to see detailed information including date, time, and CPU core values.
@@ -107,7 +108,7 @@ cpu-utilization-visualizer/
 ### Capacity Planning View
 
 -   **Independent Planning Workflow:** Runs separately from the exceeded-capacity calculation in the Machine Utilization view while reusing the same combined-interval capacity-planning logic.
--   **Metric Selection:** Choose Max, P95, P90, P80, P70, P60, P50, or Average capacity planning as the first-year planning baseline.
+-   **Metric Selection:** Choose paired same-day and different-day planning metrics for Max, P95, P90, and P80 as the first-year planning baseline.
 -   **Growth Inputs:** Provide a growth rate and a planning duration from 1 to 5 years, and the results render the same number of yearly rows as the selected duration.
 -   **Reference Sizing Calculation:** Builds a fixed final-year reference sizing by compounding growth from the first-year capacity planning value, then rounds the result up to the next whole core.
 -   **Dual Results Tables:** Shows two yearly output tables:
@@ -118,32 +119,12 @@ cpu-utilization-visualizer/
 
 ## Aggregation Modes
 
-The Machine Utilization view offers two distinct calculation methods to serve different analysis purposes:
-
-### Capacity Planning (Sum of Metrics) - DEFAULT
-
-**How it works:**
-1. Calculate the selected metric (Max, P95, etc.) for each LPAR individually across all 288 intervals
-2. Sum these metrics across all LPARs in each pool
-3. Display the total as the pool's value for that day
-
-**Example:**
-- LPAR1 peaks at 20 cores (at 10:00 AM)
-- LPAR2 peaks at 25 cores (at 3:00 PM)
-- **Result: 45 cores**
-
-**Use Cases:**
-- ✅ **Hardware Sizing:** "What capacity do I need if each workload hits its typical high usage?"
-- ✅ **Budget Planning:** Conservative estimates for infrastructure investment
-- ✅ **Capacity Planning:** Accounts for each workload's independent peak patterns
-- ✅ **Risk Mitigation:** Ensures headroom for when multiple workloads are busy
-
-**When to use:** Planning new hardware purchases, justifying capacity requirements, or ensuring adequate resources for independent workload peaks.
+The Machine Utilization view offers three distinct calculation methods to serve different analysis purposes:
 
 ### Actual Usage (Metric of Sums)
 
 **How it works:**
-1. Combine all LPAR values at each 5-minute interval (288 intervals per day)
+1. Combine all LPAR values at each 5-minute interval for the selected day
 2. Calculate the selected metric from these combined intervals
 3. Display the actual peak/percentile of the combined usage
 
@@ -152,25 +133,71 @@ The Machine Utilization view offers two distinct calculation methods to serve di
 - LPAR2 peaks at 25 cores (at 3:00 PM)
 - At 10:00 AM: LPAR1=20, LPAR2=15 → Combined=35
 - At 3:00 PM: LPAR1=10, LPAR2=25 → Combined=35
-- **Result: 35 cores** (actual maximum at any single moment)
+- **Result: 35 cores** (actual maximum at a single moment)
 
 **Use Cases:**
-- ✅ **Utilization Analysis:** "What's the real peak usage across all workloads?"
+- ✅ **Utilization Analysis:** "What's the real simultaneous peak usage across all workloads?"
 - ✅ **Waste Identification:** Compare actual usage vs. provisioned capacity
 - ✅ **Performance Troubleshooting:** Identify true bottleneck moments
 - ✅ **Consolidation Planning:** Understand actual combined resource consumption
 
-**When to use:** Analyzing current utilization, identifying over-provisioning, or understanding real-world resource consumption patterns.
+**When to use:** Analyzing current utilization, identifying over-provisioning, or understanding real-world simultaneous resource consumption patterns.
+
+### Capacity Planning (Sum of Metrics)
+
+**How it works:**
+1. Calculate the selected metric (Max, P95, P90, or P80) for each LPAR individually across all 288 intervals within the same day
+2. Sum these metrics across all LPARs in each pool
+3. Sum the pool values to produce a machine daily value
+4. Take the highest machine daily value across the selected date range
+
+**Important timing note:** The result comes from a single day, but each LPAR maximum can come from different intervals within that day.
+
+**Example:**
+- LPAR1 peaks at 20 cores (at 10:00 AM)
+- LPAR2 peaks at 25 cores (at 3:00 PM)
+- **Result: 45 cores** on that day
+
+**Use Cases:**
+- ✅ **Hardware Sizing:** "What capacity do I need if each workload hits its typical high usage on the same day?"
+- ✅ **Budget Planning:** Conservative estimates for infrastructure investment
+- ✅ **Capacity Planning:** Accounts for each workload's independent peak patterns within the same day
+- ✅ **Risk Mitigation:** Ensures headroom for busy days even if peaks do not occur at the same time
+
+**When to use:** Planning new hardware purchases when workloads are expected to be busy on the same day.
+
+### Capacity Planning (Sum of Metrics from Different Day)
+
+**How it works:**
+1. Calculate the selected metric (Max, P95, P90, or P80) for each LPAR individually for each day
+2. Sum those values within each pool for each day
+3. Find the best day independently for each pool
+4. Sum each pool's independent best-day value into a machine total
+
+**Important timing note:** The result can combine different days across pools, and different intervals within those days.
+
+**Example:**
+- IST1 best day = 40.66
+- WASND1 best day = 1.30
+- DEFAULT1 best day = 4.00
+- **Result: 45.96** even if those peaks do not occur on the same day
+
+**Use Cases:**
+- ✅ **Aggressive Sizing Envelope:** "What if each pool gets to contribute its own best day?"
+- ✅ **Worst-Case Consolidation Estimate:** Size for independently peaked pools
+- ✅ **Scenario Comparison:** Compare same-day planning vs. different-day planning assumptions
+
+**When to use:** Evaluating a more conservative sizing envelope where each pool can contribute its own best day independently.
 
 ### Key Differences
 
-| Aspect | Capacity Planning | Actual Usage |
-|--------|------------------|--------------|
-| **Calculation** | Sum of individual metrics | Metric of combined sums |
-| **Peak Timing** | Peaks can occur at different times | Peak is at a single moment |
-| **Value** | Usually higher | Usually lower (more accurate) |
-| **Purpose** | Planning & sizing | Analysis & optimization |
-| **Risk** | Conservative (safer) | Realistic (actual) |
+| Aspect | Actual Usage | Capacity Planning (same day) | Capacity Planning (different day) |
+|--------|--------------|------------------------------|-----------------------------------|
+| **Calculation** | Metric of combined sums | Sum of individual metrics on the same day | Sum of each pool's best day |
+| **Peak Timing** | Single interval | Single day, multiple intervals | Different days and different intervals |
+| **Value** | Usually lowest | Usually higher | Usually highest |
+| **Purpose** | Analysis & optimization | Planning & sizing | Conservative envelope planning |
+| **Risk** | Realistic (actual) | Conservative | Most conservative |
 
 ### Example Scenario
 
@@ -179,17 +206,26 @@ The Machine Utilization view offers two distinct calculation methods to serve di
 - **Web Server LPAR:** Peaks Monday mornings (P95 = 6 cores)
 - **Database LPAR:** Peaks during month-end (P95 = 10 cores)
 
-**Capacity Planning Mode (P95):**
-- Result: 8 + 6 + 10 = **24 cores**
-- Interpretation: "I need 24 cores to handle each workload's typical high usage"
-- Best for: Sizing a new machine to ensure all workloads have adequate resources
-
 **Actual Usage Mode (P95):**
 - Result: **18 cores** (95% of the time, combined usage is below this)
 - Interpretation: "These workloads rarely peak together, so 18 cores handles 95% of situations"
 - Best for: Understanding current utilization and identifying over-provisioning
 
-**Important Note:** The values in Machine Utilization (Actual Usage mode) will match the LPAR Utilization view when all LPARs are selected for the same date, as both calculate the metric from combined intervals.
+**Capacity Planning Mode (P95 - same day):**
+- Result: 8 + 6 + 10 = **24 cores**
+- Interpretation: "I need 24 cores to handle each workload's typical high usage on a busy day"
+- Best for: Sizing a new machine to ensure all workloads have adequate resources on the same day
+
+**Capacity Planning Mode (P95 - different day):**
+- Result: can be **24 cores or higher** if each pool contributes its own best day independently
+- Interpretation: "I want a sizing envelope based on independent pool best days"
+- Best for: Comparing a more conservative planning scenario against the same-day assumption
+
+**Important Note:** The values in Machine Utilization [`Actual Usage`](README.md:124) mode will match the stacked LPAR Utilization view when all LPARs are selected for the same date, as both calculate the metric from combined intervals.
+- Interpretation: "I want a sizing envelope based on independent pool best days"
+- Best for: Comparing a more conservative planning scenario against the same-day assumption
+
+**Important Note:** The values in Machine Utilization [`Actual Usage`](README.md:143) mode will match the stacked LPAR Utilization view when all LPARs are selected for the same date, as both calculate the metric from combined intervals.
 
 ### Configuration Example
 
@@ -215,7 +251,10 @@ Recent interface updates in [visualizer.html](visualizer.html) include:
 - Optional dark theme based on the Gray 100 theme guidance in [design.md](design.md) and [design-dark.md](design-dark.md)
 - Segmented light/dark switch in the masthead
 - Refined summary cards, comparison tables, and chart container styling for improved readability
-- Added a Capacity Planning tab for multi-year reference sizing and projected peak sufficiency analysis, including annualized exceedance columns in the Actual peak results table
+- Added a Capacity Planning tab for multi-year reference sizing and projected peak sufficiency analysis, now with three result tables covering actual peak, same-day sum-of-max, and different-day sum-of-max
+- Added a third Machine Utilization aggregation mode for `Capacity Planning (sum of metrics from different day)` and hides the machine chart for that mode
+- Updated Machine Utilization summary labels to distinguish `Single day, multiple intervals` from simultaneous peaks
+- Updated LPAR visualization to stacked rendering so the visible chart top matches the combined summary total
 - Preserved original machine stacked-bar and LPAR line-chart color behavior for data clarity
 
 ## Screenshots
