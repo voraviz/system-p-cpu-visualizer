@@ -770,32 +770,6 @@
                         </table>
                     </div>
                 </div>
-                <div>
-                    <div class="band-header" style="margin: 0 0 16px;">
-                        <div>
-                            <h3 class="band-title">Capacity planning results (same day, different intervals)</h3>
-                            <p class="band-description">Compare reference sizing against the highest same-day sum of per-LPAR metrics, where each LPAR can peak at a different interval within that day.</p>
-                        </div>
-                    </div>
-                    <div class="table-container">
-                        <table class="data-table" id="capacityPlanningPeakResultsTable">
-                            <thead>
-                                <tr>
-                                    <th>Year</th>
-                                    <th>Sum of Max (same day)</th>
-                                    <th>Reference sizing</th>
-                                    <th>Status</th>
-                                    <th>% Available</th>
-                                    <th>Exceed Minutes/year</th>
-                                    <th>Exceed Cores/year</th>
-                                </tr>
-                            </thead>
-                            <tbody id="capacityPlanningPeakResultsBody">
-                                <tr><td colspan="7">Run capacity planning calculation to view capacity planning peak results.</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
             </div>
         </section>
 
@@ -1506,11 +1480,15 @@
                         }
                     });
                 } else {
-                    const projectedSumOfMax = perLparMaxValues.reduce((sum, value) => sum + value, 0) * growthMultiplier;
-                    if (projectedSumOfMax > referenceSizing) {
-                        totalExceededMinutes += 24 * 60;
-                        totalExceededCores += projectedSumOfMax - referenceSizing;
-                    }
+                    // For 'max' mode: Count intervals where actual combined usage exceeds reference
+                    // This is the same as 'actual' mode - the difference is in how the table displays it
+                    combined.forEach(value => {
+                        const projectedValue = value * growthMultiplier;
+                        if (projectedValue > referenceSizing) {
+                            totalExceededMinutes += intervalMinutes;
+                            totalExceededCores += projectedValue - referenceSizing;
+                        }
+                    });
                 }
             });
 
@@ -1526,7 +1504,6 @@
         document.getElementById('capacityPlanningObservedPeak').innerText = '0.00';
         document.getElementById('capacityPlanningReferenceSizing').innerText = '0';
         document.getElementById('capacityPlanningResultsBody').innerHTML = '<tr><td colspan="7">Update inputs and click Calculate to view yearly results.</td></tr>';
-        document.getElementById('capacityPlanningPeakResultsBody').innerHTML = '<tr><td colspan="7">Update inputs and click Calculate to view capacity planning peak results.</td></tr>';
     }
 
     function updateCapacityPlanningTable() {
@@ -1536,14 +1513,12 @@
         const years = parseInt(document.getElementById('capacityPlanningYearSelect').value, 10) || 1;
         const pools = Array.from(document.querySelectorAll('#capacityPlanningPoolCheckboxes input:checked')).map(i => i.value);
         const resultsBody = document.getElementById('capacityPlanningResultsBody');
-        const peakResultsBody = document.getElementById('capacityPlanningPeakResultsBody');
 
         if (!config[machine] || !pools.length) {
             document.getElementById('capacityPlanningBaseValue').innerText = '0.00';
             document.getElementById('capacityPlanningObservedPeak').innerText = '0.00';
             document.getElementById('capacityPlanningReferenceSizing').innerText = '0';
             resultsBody.innerHTML = '<tr><td colspan="7">Select a machine and at least one CPU pool.</td></tr>';
-            peakResultsBody.innerHTML = '<tr><td colspan="7">Select a machine and at least one CPU pool.</td></tr>';
             return;
         }
 
@@ -1553,15 +1528,12 @@
             document.getElementById('capacityPlanningObservedPeak').innerText = '0.00';
             document.getElementById('capacityPlanningReferenceSizing').innerText = '0';
             resultsBody.innerHTML = '<tr><td colspan="7">No data available for capacity planning.</td></tr>';
-            peakResultsBody.innerHTML = '<tr><td colspan="7">No data available for capacity planning.</td></tr>';
             return;
         }
 
         const dailyValues = getCapacityPlanningDailyValues(machine, pools, dates, metric);
-        const sameDayMaxDailyValues = getCapacityPlanningDailyValues(machine, pools, dates, 'Max');
         const basePlanningValue = dailyValues.length ? Math.max(...dailyValues.map(item => item.planning)) : 0;
         const observedActualPeak = dailyValues.length ? Math.max(...dailyValues.map(item => item.actualPeak)) : 0;
-        const maxCapacityPlanningPeak = sameDayMaxDailyValues.length ? Math.max(...sameDayMaxDailyValues.map(item => item.planning)) : 0;
         const referenceSizing = Math.ceil(basePlanningValue * Math.pow(1 + growthRate, Math.max(years - 1, 0)));
 
         document.getElementById('capacityPlanningBaseValue').innerText = basePlanningValue.toFixed(2);
@@ -1569,10 +1541,8 @@
         document.getElementById('capacityPlanningReferenceSizing').innerText = referenceSizing.toLocaleString();
 
         const annualizedActualExceedance = calculateAnnualizedActualExceedance(machine, pools, referenceSizing, growthRate, years, dates, 'actual');
-        const annualizedMaxExceedance = calculateAnnualizedActualExceedance(machine, pools, referenceSizing, growthRate, years, dates, 'max');
 
         resultsBody.innerHTML = buildCapacityPlanningRows(observedActualPeak, referenceSizing, years, growthRate, annualizedActualExceedance);
-        peakResultsBody.innerHTML = buildCapacityPlanningRows(maxCapacityPlanningPeak, referenceSizing, years, growthRate, annualizedMaxExceedance);
     }
 
     function initChart(labels, datasets, isLparMultiDay = false) {
@@ -1583,14 +1553,25 @@
             intersect: false
         };
         
-        // Add custom tooltip for LPAR multi-day view to show date
-        if (currentTab === 'lpar' && isLparMultiDay && window.lparIntervalDates) {
+        // Add custom tooltip for LPAR tab
+        if (currentTab === 'lpar') {
             tooltipConfig.callbacks = {
                 title: function(context) {
-                    const index = context[0].dataIndex;
-                    const date = window.lparIntervalDates[index];
-                    const timeLabel = context[0].label;
-                    return `${date} ${timeLabel}`;
+                    if (isLparMultiDay && window.lparIntervalDates) {
+                        const index = context[0].dataIndex;
+                        const date = window.lparIntervalDates[index];
+                        const timeLabel = context[0].label;
+                        return `${date} ${timeLabel}`;
+                    }
+                    return context[0].label;
+                },
+                footer: function(context) {
+                    // Calculate sum of all values at this data point
+                    let sum = 0;
+                    context.forEach(item => {
+                        sum += item.parsed.y || 0;
+                    });
+                    return `Total: ${sum.toFixed(2)} cores`;
                 }
             };
         }
