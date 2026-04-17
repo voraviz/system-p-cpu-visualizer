@@ -27,6 +27,7 @@ try:
     PERCENT_GROWTH = float(config['MAIN'].get('PERCENT_GROWTH', '5'))
     NUM_OF_YEAR = int(config['MAIN'].get('NUM_OF_YEAR', '5'))
     REFERENCE_CORE = float(config['MAIN'].get('REFERENCE_CORE', '47'))
+    ANNUALIZATION_DAYS = int(config['MAIN'].get('ANNUALIZATION_DAYS', '365'))
 except Exception as e:
     print(f"Error parsing MAIN section in config: {e}")
     sys.exit(1)
@@ -53,6 +54,7 @@ print(f"  Interval: {INTERVAL} minutes")
 print(f"  Growth rate: {PERCENT_GROWTH}%")
 print(f"  Number of years: {NUM_OF_YEAR}")
 print(f"  Reference sizing: {REFERENCE_CORE} cores")
+print(f"  Annualization days: {ANNUALIZATION_DAYS}")
 print()
 
 # Read all LPAR data
@@ -96,14 +98,14 @@ print(f"  LPARs with data: {len(lpar_data)}")
 print(f"  Standby LPARs: {len(missing_lpars)}")
 
 # Calculate annualization factor
-# - If less than 1 calendar year (< 365 days): scale up to 365 days
-# - If 1 calendar year or more (>= 365 days): no adjustment needed (factor = 1.0)
-if len(all_dates) >= 365:
+# - If less than the configured annualization period: scale up to ANNUALIZATION_DAYS
+# - If the sampled data covers at least the configured annualization period: no adjustment needed
+if len(all_dates) >= ANNUALIZATION_DAYS:
     annualization_factor = 1.0
-    print(f"  Annualization factor: {annualization_factor:.4f} (full calendar year or more - no adjustment needed)")
+    print(f"  Annualization factor: {annualization_factor:.4f} (sample covers {ANNUALIZATION_DAYS} days or more - no adjustment needed)")
 else:
-    annualization_factor = 365 / len(all_dates)
-    print(f"  Annualization factor: {annualization_factor:.4f} (scaling up {len(all_dates)} days to 365 days)")
+    annualization_factor = ANNUALIZATION_DAYS / len(all_dates)
+    print(f"  Annualization factor: {annualization_factor:.4f} (scaling up {len(all_dates)} days to {ANNUALIZATION_DAYS} days)")
 print()
 
 # Calculate intervals per day

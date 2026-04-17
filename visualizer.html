@@ -793,7 +793,7 @@
 </div>
 
 <script>
-    let config = {}, lparData = {}, percentileMethod = 'INC', standbyValue = 0.1, intervalMinutes = 5, intervalsPerDay = 288, dateFormat = 'MM/DD/YYYY', allDates = new Set(), currentTab = 'machine', chart = null, selectedLpars = new Set(), selectedPools = new Set(), selectedCapacityPlanningPools = new Set(), aggregationMode = 'actual', startDateFilter = null, endDateFilter = null, machineVisualizationMode = 'stacked';
+    let config = {}, lparData = {}, percentileMethod = 'INC', standbyValue = 0.1, intervalMinutes = 5, intervalsPerDay = 288, annualizationDays = 365, dateFormat = 'MM/DD/YYYY', allDates = new Set(), currentTab = 'machine', chart = null, selectedLpars = new Set(), selectedPools = new Set(), selectedCapacityPlanningPools = new Set(), aggregationMode = 'actual', startDateFilter = null, endDateFilter = null, machineVisualizationMode = 'stacked';
 
     function setTheme(theme) {
         const isDark = theme === 'dark';
@@ -833,6 +833,7 @@
         standbyValue = 0.1;
         intervalMinutes = 5;
         intervalsPerDay = 288;
+        annualizationDays = 365;
         dateFormat = 'MM/DD/YYYY';
         
         // Destroy existing chart
@@ -865,6 +866,7 @@
                     const k = key.trim().toUpperCase();
                     if (k === 'PERCENTILE') percentileMethod = val.trim().toUpperCase();
                     if (k === 'STANDBY') standbyValue = parseFloat(val.trim()) || 0.1;
+                    if (k === 'ANNUALIZATION_DAYS') annualizationDays = parseInt(val.trim()) || 365;
                     if (k === 'DATEFORMAT') dateFormat = val.trim().toUpperCase();
                     if (k === 'INTERVAL') {
                         intervalMinutes = parseInt(val.trim()) || 5;
@@ -1551,9 +1553,9 @@
             return Array.from({ length: years }, () => ({ minutes: 0, cores: 0 }));
         }
 
-        // Only annualize if we have less than a full calendar year of data
-        // If we have 365+ days, no adjustment needed (factor = 1.0)
-        const annualizationFactor = sampledDayCount >= 365 ? 1.0 : 365 / sampledDayCount;
+        // Only annualize if we have less than the configured annualization period
+        // If we have annualizationDays or more sampled days, no adjustment needed (factor = 1.0)
+        const annualizationFactor = sampledDayCount >= annualizationDays ? 1.0 : annualizationDays / sampledDayCount;
 
         return Array.from({ length: years }, (_, yearIndex) => {
             const growthMultiplier = Math.pow(1 + growthRate, yearIndex);
