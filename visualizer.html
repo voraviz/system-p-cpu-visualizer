@@ -839,10 +839,12 @@
         let currentSection = '';
         lines.forEach(line => {
             line = line.trim();
-            // Remove inline comments (everything after #)
-            const commentIndex = line.indexOf('#');
-            if (commentIndex !== -1) {
-                line = line.substring(0, commentIndex).trim();
+            // Remove inline comments (everything after #), but not if # is inside section brackets
+            if (!line.startsWith('[')) {
+                const commentIndex = line.indexOf('#');
+                if (commentIndex !== -1) {
+                    line = line.substring(0, commentIndex).trim();
+                }
             }
             // Skip empty lines or lines that are now empty after removing comments
             if (!line || line.startsWith(';')) return;
