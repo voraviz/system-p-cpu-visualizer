@@ -83,7 +83,9 @@ cpu-utilization-visualizer/
 
 ### Machine Utilization View
 
--   **Stacked Bar Chart:** Visualizes daily CPU utilization for a selected machine, stacked by CPU pool.
+-   **Dual Visualization Modes:**
+    -   **Stacked View:** Traditional stacked bar chart showing daily CPU utilization by pool with tooltip showing total cores
+    -   **Comparison View:** Line graph comparing actual maximum usage against selected metric (e.g., P90, P95) with chosen aggregation method
 -   **Date Range Selection:** Filter data by selecting start and end dates using calendar widgets. Default shows full date range (oldest to newest date).
 -   **Metric Selection:** Choose between Max, Average, or various Percentiles (P50, P60, P70, P80, P90, P95) for daily aggregation.
 -   **Aggregation Mode:** Select between Actual Usage, Capacity Planning (same day), and Capacity Planning (different day) calculation methods (see [Aggregation Modes](#aggregation-modes) below).
@@ -250,6 +252,8 @@ Recent interface updates in [visualizer.html](visualizer.html) include:
 - Added a third Machine Utilization aggregation mode for `Capacity Planning (sum of metrics from different day)` and hides the machine chart for that mode
 - Updated Machine Utilization summary labels to distinguish `Single day, multiple intervals` from simultaneous peaks
 - Updated LPAR visualization to stacked rendering so the visible chart top matches the combined summary total
+- **Added Machine Utilization Comparison View:** New visualization sub-tab that displays a line graph comparing actual maximum usage against selected metric (P90, P95, Max, etc.) with chosen aggregation method, making it easier to visualize capacity planning thresholds versus actual usage patterns
+- Enhanced tooltips in Machine Utilization stacked view to show total cores when hovering over bars
 - Preserved original machine stacked-bar and LPAR line-chart color behavior for data clarity
 
 ## Screenshots

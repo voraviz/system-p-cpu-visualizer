@@ -640,7 +640,7 @@
                     <option value="p50">P50</option><option value="Avg">Average</option>
                 </select></div>
                 <div class="field-group control-item"><label for="aggregationModeSelect">Aggregation mode</label><select id="aggregationModeSelect" onchange="aggregationMode = this.value; updateMachineChart()" title="Capacity Planning: Sum each LPAR's metric within the same day. Actual Usage: Calculate metric from combined intervals (real peak). Capacity Planning (different day): Sum each pool's best metric across different days.">
-                    <option value="actual">Actual usage (metric of sums)</option>
+                    <option value="actual">Actual usage</option>
                     <option value="capacity">Capacity planning (sum of metrics)</option>
                     <option value="capacityDifferentDay">Capacity Planning (sum of metrics from different day)</option>
                 </select></div>
@@ -780,13 +780,20 @@
                     <p class="band-description">The chart adapts between machine-level stacked bar analysis and interval-based LPAR trend lines.</p>
                 </div>
             </div>
+            
+            <!-- Sub-tabs for Machine Utilization visualization -->
+            <div id="machineVisualizationTabs" class="tabs" style="margin-top: 0; border-top: none;">
+                <button id="tabBtnMachineStacked" class="tab-btn active" onclick="switchMachineVisualization('stacked')">Stacked View</button>
+                <button id="tabBtnMachineComparison" class="tab-btn" onclick="switchMachineVisualization('comparison')">Comparison View</button>
+            </div>
+            
             <div class="chart-container"><canvas id="cpuChart"></canvas></div>
         </section>
     </main>
 </div>
 
 <script>
-    let config = {}, lparData = {}, percentileMethod = 'INC', standbyValue = 0.1, intervalMinutes = 5, intervalsPerDay = 288, dateFormat = 'MM/DD/YYYY', allDates = new Set(), currentTab = 'machine', chart = null, selectedLpars = new Set(), selectedPools = new Set(), selectedCapacityPlanningPools = new Set(), aggregationMode = 'capacity', startDateFilter = null, endDateFilter = null;
+    let config = {}, lparData = {}, percentileMethod = 'INC', standbyValue = 0.1, intervalMinutes = 5, intervalsPerDay = 288, dateFormat = 'MM/DD/YYYY', allDates = new Set(), currentTab = 'machine', chart = null, selectedLpars = new Set(), selectedPools = new Set(), selectedCapacityPlanningPools = new Set(), aggregationMode = 'capacity', startDateFilter = null, endDateFilter = null, machineVisualizationMode = 'stacked';
 
     function setTheme(theme) {
         const isDark = theme === 'dark';
@@ -1037,9 +1044,23 @@
         document.getElementById('lparSummary').classList.toggle('hidden', tab !== 'lpar');
         document.getElementById('capacityPlanningControls').classList.toggle('hidden', tab !== 'capacityPlanning');
         document.querySelector('.chart-band').classList.toggle('hidden', tab === 'capacityPlanning');
+        
+        // Show/hide machine visualization sub-tabs
+        const machineVisualizationTabs = document.getElementById('machineVisualizationTabs');
+        if (machineVisualizationTabs) {
+            machineVisualizationTabs.classList.toggle('hidden', tab !== 'machine');
+        }
+        
         if (tab === 'machine') populatePoolCheckboxes();
         else if (tab === 'lpar') populateLparList();
         else populateCapacityPlanningPoolCheckboxes();
+    }
+
+    function switchMachineVisualization(mode) {
+        machineVisualizationMode = mode;
+        document.getElementById('tabBtnMachineStacked').classList.toggle('active', mode === 'stacked');
+        document.getElementById('tabBtnMachineComparison').classList.toggle('active', mode === 'comparison');
+        updateMachineChart();
     }
 
     function populatePoolCheckboxes() {
@@ -1261,7 +1282,83 @@
             }
             return;
         }
-        initChart(dates, datasets);
+        
+        // Handle different visualization modes
+        if (machineVisualizationMode === 'comparison') {
+            // Comparison view: Show actual vs selected metric
+            const actualDaily = dates.map(d => {
+                const combined = Array(intervalsPerDay).fill(0);
+                pools.forEach(p => {
+                    config[m][p].forEach(l => {
+                        const intervals = getLparStats(l, d).intervals;
+                        intervals.forEach((v, i) => combined[i] += v);
+                    });
+                });
+                return Math.max(...combined);
+            });
+            
+            let metricDaily;
+            if (aggregationMode === 'capacity' || aggregationMode === 'capacityDifferentDay') {
+                // Capacity Planning: Sum of individual LPAR metrics
+                metricDaily = dates.map(d => pools.reduce((sum, p) => {
+                    return sum + config[m][p].reduce((lparSum, l) => {
+                        return lparSum + getLparStats(l, d)[met];
+                    }, 0);
+                }, 0));
+            } else {
+                // Actual Usage: Metric of combined intervals
+                metricDaily = dates.map(d => {
+                    const combined = Array(intervalsPerDay).fill(0);
+                    pools.forEach(p => {
+                        config[m][p].forEach(l => {
+                            const intervals = getLparStats(l, d).intervals;
+                            intervals.forEach((v, i) => combined[i] += v);
+                        });
+                    });
+                    if (met === "Max") return Math.max(...combined);
+                    else if (met === "Avg") return combined.reduce((a, b) => a + b, 0) / intervalsPerDay;
+                    else if (met.startsWith('p')) return calculatePercentile(combined, parseInt(met.substring(1)) / 100);
+                    return 0;
+                });
+            }
+            
+            // Create descriptive aggregation mode label
+            const aggregationModeLabel = aggregationMode === 'capacity'
+                ? 'Capacity planning (sum of metrics)'
+                : aggregationMode === 'capacityDifferentDay'
+                ? 'Capacity Planning (sum of metrics from different day)'
+                : 'Actual usage (metric of sums)';
+            
+            const comparisonDatasets = [
+                {
+                    label: 'Actual (Max)',
+                    data: actualDaily,
+                    borderColor: '#0f62fe',
+                    backgroundColor: 'rgba(15, 98, 254, 0.1)',
+                    fill: false,
+                    borderWidth: 2,
+                    pointRadius: 3,
+                    pointHoverRadius: 5,
+                    tension: 0.1
+                },
+                {
+                    label: `${met.toUpperCase()} ${aggregationModeLabel}`,
+                    data: metricDaily,
+                    borderColor: '#da1e28',
+                    backgroundColor: 'rgba(218, 30, 40, 0.1)',
+                    fill: false,
+                    borderWidth: 2,
+                    pointRadius: 3,
+                    pointHoverRadius: 5,
+                    tension: 0.1
+                }
+            ];
+            
+            initChart(dates, comparisonDatasets, false, false);
+        } else {
+            // Stacked view: Original behavior
+            initChart(dates, datasets);
+        }
     }
 
     function updateLparChart() {
@@ -1557,7 +1654,7 @@
         resultsBody.innerHTML = buildCapacityPlanningRows(observedActualPeak, referenceSizing, years, growthRate, annualizedActualExceedance);
     }
 
-    function initChart(labels, datasets, isLparMultiDay = false) {
+    function initChart(labels, datasets, isLparMultiDay = false, isComparison = false) {
         if (chart) chart.destroy();
         
         const tooltipConfig = {
@@ -1588,8 +1685,26 @@
             };
         }
         
+        // Add custom tooltip for Machine tab stacked view
+        if (currentTab === 'machine' && machineVisualizationMode === 'stacked') {
+            tooltipConfig.callbacks = {
+                footer: function(context) {
+                    // Calculate sum of all values at this data point
+                    let sum = 0;
+                    context.forEach(item => {
+                        sum += item.parsed.y || 0;
+                    });
+                    return `Total: ${sum.toFixed(2)} cores`;
+                }
+            };
+        }
+        
+        // Determine chart type and stacking based on mode
+        const isLineChart = currentTab === 'lpar' || (currentTab === 'machine' && machineVisualizationMode === 'comparison');
+        const shouldStack = (currentTab === 'machine' && machineVisualizationMode === 'stacked') || currentTab === 'lpar';
+        
         chart = new Chart(document.getElementById('cpuChart').getContext('2d'), {
-            type: currentTab === 'lpar' ? 'line' : 'bar',
+            type: isLineChart ? 'line' : 'bar',
             data: { labels, datasets },
             options: {
                 responsive: true,
@@ -1597,12 +1712,12 @@
                 interaction: { mode: 'index', intersect: false },
                 scales: {
                     x: {
-                        stacked: currentTab === 'machine' || currentTab === 'lpar',
+                        stacked: shouldStack,
                         grid: { color: getComputedStyle(document.body).getPropertyValue('--cds-chart-grid').trim(), drawBorder: false },
                         ticks: { color: getComputedStyle(document.body).getPropertyValue('--cds-text-secondary').trim(), maxRotation: 0, autoSkip: true }
                     },
                     y: {
-                        stacked: currentTab === 'machine' || currentTab === 'lpar',
+                        stacked: shouldStack,
                         title: { display: true, text: 'Cores', color: getComputedStyle(document.body).getPropertyValue('--cds-text-secondary').trim() },
                         grid: { color: getComputedStyle(document.body).getPropertyValue('--cds-chart-grid').trim(), drawBorder: false },
                         ticks: { color: getComputedStyle(document.body).getPropertyValue('--cds-text-secondary').trim() }
