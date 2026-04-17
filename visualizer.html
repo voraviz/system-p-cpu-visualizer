@@ -1551,9 +1551,9 @@
             return Array.from({ length: years }, () => ({ minutes: 0, cores: 0 }));
         }
 
-        // Only annualize if we have less than a full year of data
-        // If we have 360+ days, no adjustment needed (factor = 1.0)
-        const annualizationFactor = sampledDayCount >= 360 ? 1.0 : 360 / sampledDayCount;
+        // Only annualize if we have less than a full calendar year of data
+        // If we have 365+ days, no adjustment needed (factor = 1.0)
+        const annualizationFactor = sampledDayCount >= 365 ? 1.0 : 365 / sampledDayCount;
 
         return Array.from({ length: years }, (_, yearIndex) => {
             const growthMultiplier = Math.pow(1 + growthRate, yearIndex);

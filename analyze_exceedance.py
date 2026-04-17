@@ -96,14 +96,14 @@ print(f"  LPARs with data: {len(lpar_data)}")
 print(f"  Standby LPARs: {len(missing_lpars)}")
 
 # Calculate annualization factor
-# - If less than 1 year (< 360 days): scale up to 360 days
-# - If 1 year or more (>= 360 days): no adjustment needed (factor = 1.0)
-if len(all_dates) >= 360:
+# - If less than 1 calendar year (< 365 days): scale up to 365 days
+# - If 1 calendar year or more (>= 365 days): no adjustment needed (factor = 1.0)
+if len(all_dates) >= 365:
     annualization_factor = 1.0
-    print(f"  Annualization factor: {annualization_factor:.4f} (full year or more - no adjustment needed)")
+    print(f"  Annualization factor: {annualization_factor:.4f} (full calendar year or more - no adjustment needed)")
 else:
-    annualization_factor = 360 / len(all_dates)
-    print(f"  Annualization factor: {annualization_factor:.4f} (scaling up {len(all_dates)} days to 360 days)")
+    annualization_factor = 365 / len(all_dates)
+    print(f"  Annualization factor: {annualization_factor:.4f} (scaling up {len(all_dates)} days to 365 days)")
 print()
 
 # Calculate intervals per day
