@@ -723,8 +723,10 @@
                     <option value="4">4 years</option>
                     <option value="5">5 years</option>
                 </select></div>
-                <div class="field-group control-item"><label for="capacityPlanningGrowthRate">Percent growth</label><input type="number" id="capacityPlanningGrowthRate" min="0" step="0.1" value="5" onchange="resetCapacityPlanningResults()" oninput="resetCapacityPlanningResults()"></div>
-                <div class="field-group control-item-wide">
+                <div class="field-group control-item"></div>
+                <div class="field-group control-item"><label for="capacityPlanningGrowthRate">Base planning growth (%)</label><input type="number" id="capacityPlanningGrowthRate" min="0" step="0.1" value="5" onchange="resetCapacityPlanningResults()" oninput="resetCapacityPlanningResults()"></div>
+                <div class="field-group control-item"><label for="cpuUtilizationGrowthRate">CPU utilization growth (%)</label><input type="number" id="cpuUtilizationGrowthRate" min="0" step="0.1" value="5" onchange="resetCapacityPlanningResults()" oninput="resetCapacityPlanningResults()"></div>
+                <div class="field-group" style="grid-column: span 12;">
                     <label>CPU pools</label>
                     <div id="capacityPlanningPoolCheckboxes" class="checkbox-group"></div>
                     <div class="checkbox-actions" style="margin-top: 1rem;">
@@ -1523,10 +1525,10 @@
         });
     }
 
-    function buildCapacityPlanningRows(comparisonValue, referenceSizing, years, growthRate, annualExceedanceByYear = null) {
+    function buildCapacityPlanningRows(comparisonValue, referenceSizing, years, cpuUtilizationGrowthRate, annualExceedanceByYear = null) {
         const rows = [];
         for (let yearIndex = 1; yearIndex <= years; yearIndex++) {
-            const growthMultiplier = Math.pow(1 + growthRate, yearIndex - 1);
+            const growthMultiplier = Math.pow(1 + cpuUtilizationGrowthRate, yearIndex - 1);
             const yearComparisonValue = comparisonValue * growthMultiplier;
             const availablePercent = referenceSizing > 0 ? ((referenceSizing - yearComparisonValue) / referenceSizing) * 100 : 0;
             const isEnough = referenceSizing >= yearComparisonValue;
@@ -1547,7 +1549,7 @@
         return rows.join('');
     }
 
-    function calculateAnnualizedActualExceedance(machine, pools, referenceSizing, growthRate, years, dates, valueType = 'actual') {
+    function calculateAnnualizedActualExceedance(machine, pools, referenceSizing, cpuUtilizationGrowthRate, years, dates, valueType = 'actual') {
         const sampledDayCount = dates.length || 0;
         if (!sampledDayCount) {
             return Array.from({ length: years }, () => ({ minutes: 0, cores: 0 }));
@@ -1558,7 +1560,7 @@
         const annualizationFactor = sampledDayCount >= annualizationDays ? 1.0 : annualizationDays / sampledDayCount;
 
         return Array.from({ length: years }, (_, yearIndex) => {
-            const growthMultiplier = Math.pow(1 + growthRate, yearIndex);
+            const growthMultiplier = Math.pow(1 + cpuUtilizationGrowthRate, yearIndex);
             let totalExceededMinutes = 0;
             let totalExceededCores = 0;
 
@@ -1620,7 +1622,8 @@
     function updateCapacityPlanningTable() {
         const machine = document.getElementById('capacityPlanningMachineSelect').value;
         const metric = document.getElementById('capacityPlanningMetricSelect').value;
-        const growthRate = (parseFloat(document.getElementById('capacityPlanningGrowthRate').value) || 0) / 100;
+        const basePlanningGrowthRate = (parseFloat(document.getElementById('capacityPlanningGrowthRate').value) || 0) / 100;
+        const cpuUtilizationGrowthRate = (parseFloat(document.getElementById('cpuUtilizationGrowthRate').value) || 0) / 100;
         const years = parseInt(document.getElementById('capacityPlanningYearSelect').value, 10) || 1;
         const pools = Array.from(document.querySelectorAll('#capacityPlanningPoolCheckboxes input:checked')).map(i => i.value);
         const resultsBody = document.getElementById('capacityPlanningResultsBody');
@@ -1645,15 +1648,15 @@
         const dailyValues = getCapacityPlanningDailyValues(machine, pools, dates, metric);
         const basePlanningValue = dailyValues.length ? Math.max(...dailyValues.map(item => item.planning)) : 0;
         const observedActualPeak = dailyValues.length ? Math.max(...dailyValues.map(item => item.actualPeak)) : 0;
-        const referenceSizing = Math.ceil(basePlanningValue * Math.pow(1 + growthRate, Math.max(years - 1, 0)));
+        const referenceSizing = Math.ceil(basePlanningValue * Math.pow(1 + basePlanningGrowthRate, Math.max(years - 1, 0)));
 
         document.getElementById('capacityPlanningBaseValue').innerText = basePlanningValue.toFixed(2);
         document.getElementById('capacityPlanningObservedPeak').innerText = observedActualPeak.toFixed(2);
         document.getElementById('capacityPlanningReferenceSizing').innerText = referenceSizing.toLocaleString();
 
-        const annualizedActualExceedance = calculateAnnualizedActualExceedance(machine, pools, referenceSizing, growthRate, years, dates, 'actual');
+        const annualizedActualExceedance = calculateAnnualizedActualExceedance(machine, pools, referenceSizing, cpuUtilizationGrowthRate, years, dates, 'actual');
 
-        resultsBody.innerHTML = buildCapacityPlanningRows(observedActualPeak, referenceSizing, years, growthRate, annualizedActualExceedance);
+        resultsBody.innerHTML = buildCapacityPlanningRows(observedActualPeak, referenceSizing, years, cpuUtilizationGrowthRate, annualizedActualExceedance);
     }
 
     function initChart(labels, datasets, isLparMultiDay = false, isComparison = false) {
