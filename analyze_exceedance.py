@@ -24,7 +24,8 @@ try:
     STANDBY = float(config['MAIN'].get('STANDBY', '0.1'))
     INTERVAL = int(config['MAIN'].get('INTERVAL', '5'))
     DATA_DIR = config['MAIN'].get('DATA_DIR', 'data-internal')
-    PERCENT_GROWTH = float(config['MAIN'].get('PERCENT_GROWTH', '5'))
+    BASE_PLANNING_GROWTH = float(config['MAIN'].get('BASE_PLANNING_GROWTH', '5'))
+    CPU_UTILIZATION_GROWTH = float(config['MAIN'].get('CPU_UTILIZATION_GROWTH', '5'))
     NUM_OF_YEAR = int(config['MAIN'].get('NUM_OF_YEAR', '5'))
     REFERENCE_CORE = float(config['MAIN'].get('REFERENCE_CORE', '47'))
     ANNUALIZATION_DAYS = int(config['MAIN'].get('ANNUALIZATION_DAYS', '365'))
@@ -51,7 +52,8 @@ print(f"Configuration loaded from: {config_file}")
 print(f"  Data directory: {DATA_DIR}")
 print(f"  Standby value: {STANDBY} cores")
 print(f"  Interval: {INTERVAL} minutes")
-print(f"  Growth rate: {PERCENT_GROWTH}%")
+print(f"  Base planning growth: {BASE_PLANNING_GROWTH}%")
+print(f"  CPU utilization growth: {CPU_UTILIZATION_GROWTH}%")
 print(f"  Number of years: {NUM_OF_YEAR}")
 print(f"  Reference sizing: {REFERENCE_CORE} cores")
 print(f"  Annualization days: {ANNUALIZATION_DAYS}")
@@ -92,10 +94,32 @@ for lpar in lpar_data.values():
     all_dates.update(lpar.keys())
 all_dates = sorted(list(all_dates))
 
+# Calculate intervals per day
+intervals_per_day = (24 * 60) // INTERVAL
+
+# Calculate base planning value from data (max of daily sums)
+daily_sums = []
+for date in all_dates:
+    daily_max = 0
+    for interval_idx in range(intervals_per_day):
+        interval_total = 0
+        # Add data from available LPARs
+        for lpar_name, dates_data in lpar_data.items():
+            if date in dates_data and interval_idx < len(dates_data[date]):
+                interval_total += dates_data[date][interval_idx]
+        # Add standby LPARs
+        interval_total += len(missing_lpars) * STANDBY
+        if interval_total > daily_max:
+            daily_max = interval_total
+    daily_sums.append(daily_max)
+
+calculated_base_planning_value = max(daily_sums) if daily_sums else 0
+
 print(f"Analysis Summary:")
 print(f"  Total dates: {len(all_dates)}")
 print(f"  LPARs with data: {len(lpar_data)}")
 print(f"  Standby LPARs: {len(missing_lpars)}")
+print(f"  Calculated base planning value: {calculated_base_planning_value:.2f} cores")
 
 # Calculate annualization factor
 # - If less than the configured annualization period: scale up to ANNUALIZATION_DAYS
@@ -108,20 +132,29 @@ else:
     print(f"  Annualization factor: {annualization_factor:.4f} (scaling up {len(all_dates)} days to {ANNUALIZATION_DAYS} days)")
 print()
 
-# Calculate intervals per day
-intervals_per_day = (24 * 60) // INTERVAL
-
 # Find exceedances for each year
 print("=" * 80)
 print("CAPACITY PLANNING RESULTS (Year by Year)")
 print("=" * 80)
 print()
 
-growth_rate = PERCENT_GROWTH / 100
+base_planning_growth_rate = BASE_PLANNING_GROWTH / 100
+cpu_utilization_growth_rate = CPU_UTILIZATION_GROWTH / 100
 yearly_exceedances = {}
 
+# Calculate reference sizing from base planning value with growth
+calculated_reference_sizing = calculated_base_planning_value * ((1 + base_planning_growth_rate) ** max(NUM_OF_YEAR - 1, 0))
+
+# Use REFERENCE_CORE from config (allows manual override)
+reference_sizing = REFERENCE_CORE
+
+print(f"Base planning value (from data): {calculated_base_planning_value:.2f} cores")
+print(f"Calculated reference sizing (Year {NUM_OF_YEAR}): {calculated_reference_sizing:.2f} cores")
+print(f"Using reference sizing from config: {reference_sizing:.2f} cores")
+print()
+
 for year in range(1, NUM_OF_YEAR + 1):
-    growth_multiplier_year = (1 + growth_rate) ** (year - 1)
+    growth_multiplier_year = (1 + cpu_utilization_growth_rate) ** (year - 1)
     
     exceedances = []
     total_excess_cores = 0
@@ -145,14 +178,14 @@ for year in range(1, NUM_OF_YEAR + 1):
                 lpar_contributions[missing_lpar] = STANDBY
             total += len(missing_lpars) * STANDBY
             
-            # Apply growth
+            # Apply CPU utilization growth
             projected = total * growth_multiplier_year
             
-            if projected > REFERENCE_CORE:
+            if projected > reference_sizing:
                 hour = (interval_idx * INTERVAL) // 60
                 minute = (interval_idx * INTERVAL) % 60
                 time_str = f"{hour:02d}:{minute:02d}"
-                excess = projected - REFERENCE_CORE
+                excess = projected - reference_sizing
                 total_excess_cores += excess
                 
                 # Store exceedance with LPAR details
@@ -202,7 +235,7 @@ for year in range(1, NUM_OF_YEAR + 1):
                 'ALL_LPARS',
                 exc['date'],
                 exc['time'],
-                f"{REFERENCE_CORE:.4f}",
+                f"{reference_sizing:.4f}",
                 f"{exc['projected']:.4f}",
                 f"{exc['excess']:.4f}"
             ])
