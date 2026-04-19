@@ -577,34 +577,6 @@
             <button id="tabBtnCapacityPlanning" class="tab-btn" onclick="switchTab('capacityPlanning')">Capacity Planning</button>
         </div>
 
-        <section id="machineSummary" class="summary-band">
-            <div class="band-header">
-                <div>
-                    <h2 class="band-title">Machine summary</h2>
-                    <p class="band-description">Track machine-wide low and high points together with pool-level daily extremes for the selected aggregation mode.</p>
-                </div>
-            </div>
-            <div class="summary-dashboard" id="machineTotals">
-                <div class="stat-card" style="--accent: var(--cds-support-success);">
-                    <h3 id="minLabel">Machine min</h3>
-                    <div id="statMinDate" class="stat-date">-</div>
-                    <div id="statMin" class="stat-val">0.00</div>
-                    <div id="statMinLabel" class="stat-label">Cores</div>
-                </div>
-                <div class="stat-card" style="--accent: var(--cds-support-error);">
-                    <h3 id="maxLabel">Machine max</h3>
-                    <div id="statMaxDate" class="stat-date">-</div>
-                    <div id="statMax" class="stat-val">0.00</div>
-                    <div id="statMaxLabel" class="stat-label">Cores</div>
-                </div>
-            </div>
-            <div style="margin-top: 24px;">
-                <div class="section-title">Individual pool performance</div>
-                <p class="band-description" id="poolPerformanceDescription">LPAR maximum can come from different intervals within the same day.</p>
-                <div id="poolBreakdown" class="pool-breakdown"></div>
-            </div>
-        </section>
-
         <section id="lparSummary" class="summary-band hidden">
             <div class="band-header">
                 <div>
@@ -644,9 +616,10 @@
                     <option value="capacity">Capacity planning (sum of metrics)</option>
                     <option value="capacityDifferentDay">Capacity Planning (sum of metrics from different day)</option>
                 </select></div>
+                <div class="field-group control-item"></div>
                 <div class="field-group control-item"><label for="startDateSelect">Start date</label><input type="date" id="startDateSelect" onchange="updateMachineChart()" title="Select start date for data range (leave empty for all dates)"></div>
                 <div class="field-group control-item"><label for="endDateSelect">End date</label><input type="date" id="endDateSelect" onchange="updateMachineChart()" title="Select end date for data range (leave empty for all dates)"></div>
-                <div class="field-group control-item-wide">
+                <div class="field-group" style="grid-column: span 12;">
                     <label>CPU pools</label>
                     <div id="poolCheckboxes" class="checkbox-group"></div>
                     <div class="checkbox-actions"></div>
@@ -677,6 +650,34 @@
                         <div class="exceed-card-label">Peak cores</div>
                     </div>
                 </div>
+            </div>
+        </section>
+
+        <section id="machineSummary" class="summary-band">
+            <div class="band-header">
+                <div>
+                    <h2 class="band-title">Machine summary</h2>
+                    <p class="band-description">Track machine-wide low and high points together with pool-level daily extremes for the selected aggregation mode.</p>
+                </div>
+            </div>
+            <div class="summary-dashboard" id="machineTotals">
+                <div class="stat-card" style="--accent: var(--cds-support-success);">
+                    <h3 id="minLabel">Machine min</h3>
+                    <div id="statMinDate" class="stat-date">-</div>
+                    <div id="statMin" class="stat-val">0.00</div>
+                    <div id="statMinLabel" class="stat-label">Cores</div>
+                </div>
+                <div class="stat-card" style="--accent: var(--cds-support-error);">
+                    <h3 id="maxLabel">Machine max</h3>
+                    <div id="statMaxDate" class="stat-date">-</div>
+                    <div id="statMax" class="stat-val">0.00</div>
+                    <div id="statMaxLabel" class="stat-label">Cores</div>
+                </div>
+            </div>
+            <div style="margin-top: 24px;">
+                <div class="section-title">Individual pool performance</div>
+                <p class="band-description" id="poolPerformanceDescription">LPAR maximum can come from different intervals within the same day.</p>
+                <div id="poolBreakdown" class="pool-breakdown"></div>
             </div>
         </section>
 
