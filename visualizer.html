@@ -850,15 +850,28 @@
         let currentSection = '';
         lines.forEach(line => {
             line = line.trim();
-            // Remove inline comments (everything after #), but not if # is inside section brackets
+            // Remove inline comments (everything after # or ;), but not if inside section brackets
             if (!line.startsWith('[')) {
-                const commentIndex = line.indexOf('#');
+                // Find the first occurrence of either # or ; (whichever comes first)
+                const hashIndex = line.indexOf('#');
+                const semicolonIndex = line.indexOf(';');
+                let commentIndex = -1;
+                
+                if (hashIndex !== -1 && semicolonIndex !== -1) {
+                    // Both exist, use whichever comes first
+                    commentIndex = Math.min(hashIndex, semicolonIndex);
+                } else if (hashIndex !== -1) {
+                    commentIndex = hashIndex;
+                } else if (semicolonIndex !== -1) {
+                    commentIndex = semicolonIndex;
+                }
+                
                 if (commentIndex !== -1) {
                     line = line.substring(0, commentIndex).trim();
                 }
             }
             // Skip empty lines or lines that are now empty after removing comments
-            if (!line || line.startsWith(';')) return;
+            if (!line) return;
             
             if (line.startsWith('[') && line.endsWith(']')) {
                 currentSection = line.substring(1, line.length - 1).toUpperCase();

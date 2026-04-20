@@ -11,8 +11,8 @@ if len(sys.argv) < 2:
 
 config_file = sys.argv[1]
 
-# Read configuration with inline comment support
-config = configparser.ConfigParser(inline_comment_prefixes=('#',))
+# Read configuration with inline comment support (both # and ; at beginning of line)
+config = configparser.ConfigParser(inline_comment_prefixes=('#', ';'))
 try:
     config.read(config_file)
 except Exception as e:
