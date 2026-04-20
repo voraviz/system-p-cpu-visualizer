@@ -700,11 +700,14 @@
             <div class="band-header">
                 <div>
                     <h2 class="band-title">Capacity planning controls</h2>
-                    <p class="band-description">Calculate a multi-year reference sizing independently from the Machine Utilization tab using the same capacity-planning method.</p>
+                    <p class="band-description">Calculate a multi-year reference sizing for single or multiple machines. When multiple machines are selected, reference sizing and CPU utilization are summed across all selected machines.</p>
                 </div>
             </div>
             <div class="controls">
-                <div class="field-group control-item"><label for="capacityPlanningMachineSelect">Select machine</label><select id="capacityPlanningMachineSelect" onchange="selectedCapacityPlanningPools.clear(); populateCapacityPlanningPoolCheckboxes(); resetCapacityPlanningResults()"></select></div>
+                <div class="field-group" style="grid-column: span 12;">
+                    <label>Select machines</label>
+                    <div id="capacityPlanningMachineCheckboxes" class="checkbox-group"></div>
+                </div>
                 <div class="field-group control-item"><label for="capacityPlanningMetricSelect">Capacity planning metric</label><select id="capacityPlanningMetricSelect" onchange="resetCapacityPlanningResults()">
                     <option value="Max">Max - Sum of metrics</option>
                     <option value="MaxDifferentDay">Max - Sum of metrics from different day</option>
@@ -725,8 +728,11 @@
                     <option value="5">5 years</option>
                 </select></div>
                 <div class="field-group control-item"></div>
+                <div class="field-group control-item"></div>
                 <div class="field-group control-item"><label for="capacityPlanningGrowthRate">Base planning growth (%)</label><input type="number" id="capacityPlanningGrowthRate" min="0" step="0.1" value="5" onchange="resetCapacityPlanningResults()" oninput="resetCapacityPlanningResults()"></div>
                 <div class="field-group control-item"><label for="cpuUtilizationGrowthRate">CPU utilization growth (%)</label><input type="number" id="cpuUtilizationGrowthRate" min="0" step="0.1" value="5" onchange="resetCapacityPlanningResults()" oninput="resetCapacityPlanningResults()"></div>
+                <div class="field-group control-item"></div>
+                <div class="field-group control-item"></div>
                 <div class="field-group" style="grid-column: span 12;">
                     <label>CPU pools</label>
                     <div id="capacityPlanningPoolCheckboxes" class="checkbox-group"></div>
@@ -738,7 +744,7 @@
             <div class="band-header" style="margin-top: 2rem;">
                 <div>
                     <h2 class="band-title">Capacity planning summary</h2>
-                    <p class="band-description">Review the base planning statistic, reference sizing for the selected horizon, and year-by-year headroom against projected actual peak usage.</p>
+                    <p class="band-description">Review the base planning statistic, reference sizing for the selected horizon, and year-by-year headroom against projected actual peak usage. Values are summed across all selected machines.</p>
                 </div>
             </div>
             <div class="summary-dashboard" id="capacityPlanningSummaryCards">
@@ -796,7 +802,7 @@
 </div>
 
 <script>
-    let config = {}, lparData = {}, percentileMethod = 'INC', standbyValue = 0.1, intervalMinutes = 5, intervalsPerDay = 288, annualizationDays = 365, dateFormat = 'MM/DD/YYYY', allDates = new Set(), currentTab = 'machine', chart = null, selectedLpars = new Set(), selectedPools = new Set(), selectedCapacityPlanningPools = new Set(), aggregationMode = 'actual', startDateFilter = null, endDateFilter = null, machineVisualizationMode = 'stacked';
+    let config = {}, lparData = {}, percentileMethod = 'INC', standbyValue = 0.1, intervalMinutes = 5, intervalsPerDay = 288, annualizationDays = 365, dateFormat = 'MM/DD/YYYY', allDates = new Set(), currentTab = 'machine', chart = null, selectedLpars = new Set(), selectedPools = new Set(), selectedCapacityPlanningPools = new Set(), selectedCapacityPlanningMachines = new Set(), aggregationMode = 'actual', startDateFilter = null, endDateFilter = null, machineVisualizationMode = 'stacked';
 
     function setTheme(theme) {
         const isDark = theme === 'dark';
@@ -972,11 +978,10 @@
 
     function updateSelectors() {
         const sortedDates = Array.from(allDates).sort((a, b) => new Date(a) - new Date(b));
-        const m1 = document.getElementById('machineSelect'), m2 = document.getElementById('lparMachineSelect'), m3 = document.getElementById('capacityPlanningMachineSelect');
+        const m1 = document.getElementById('machineSelect'), m2 = document.getElementById('lparMachineSelect');
         const machineOptions = Object.keys(config).map(m => `<option value="${m}">${m}</option>`).join('');
         m1.innerHTML = machineOptions;
         m2.innerHTML = machineOptions;
-        m3.innerHTML = machineOptions;
         
         // Set min/max for date pickers and default values based on available data
         if (sortedDates.length > 0) {
@@ -1009,7 +1014,7 @@
         
         if (currentTab === 'machine') populatePoolCheckboxes();
         else if (currentTab === 'lpar') populateLparList();
-        else populateCapacityPlanningPoolCheckboxes();
+        else populateCapacityPlanningMachineCheckboxes();
     }
     
     function formatDateForInput(dateStr) {
@@ -1071,7 +1076,7 @@
         
         if (tab === 'machine') populatePoolCheckboxes();
         else if (tab === 'lpar') populateLparList();
-        else populateCapacityPlanningPoolCheckboxes();
+        else populateCapacityPlanningMachineCheckboxes();
     }
 
     function switchMachineVisualization(mode) {
@@ -1101,14 +1106,60 @@
         }
     }
 
-    function populateCapacityPlanningPoolCheckboxes() {
-        const m = document.getElementById('capacityPlanningMachineSelect').value, container = document.getElementById('capacityPlanningPoolCheckboxes');
-        if (!config[m]) return;
-        const pools = Object.keys(config[m]);
-        if (selectedCapacityPlanningPools.size === 0) {
-            pools.forEach(p => selectedCapacityPlanningPools.add(p));
+    function populateCapacityPlanningMachineCheckboxes() {
+        const container = document.getElementById('capacityPlanningMachineCheckboxes');
+        const machines = Object.keys(config);
+        
+        // If no machines selected yet, select all by default
+        if (selectedCapacityPlanningMachines.size === 0) {
+            machines.forEach(m => selectedCapacityPlanningMachines.add(m));
         }
-        container.innerHTML = pools.map(p => `<div class="checkbox-item"><input type="checkbox" ${selectedCapacityPlanningPools.has(p) ? 'checked' : ''} value="${p}" onchange="updateCapacityPlanningPoolSelection(this); resetCapacityPlanningResults()"> <span>${p}</span></div>`).join('');
+        
+        container.innerHTML = machines.map(m => `<div class="checkbox-item"><input type="checkbox" ${selectedCapacityPlanningMachines.has(m) ? 'checked' : ''} value="${m}" onchange="updateCapacityPlanningMachineSelection(this)"> <span>${m}</span></div>`).join('');
+        
+        // Populate pools after machines are set
+        populateCapacityPlanningPoolCheckboxes();
+    }
+
+    function updateCapacityPlanningMachineSelection(checkbox) {
+        if (checkbox.checked) {
+            selectedCapacityPlanningMachines.add(checkbox.value);
+        } else {
+            selectedCapacityPlanningMachines.delete(checkbox.value);
+        }
+        // Update pools when machine selection changes
+        populateCapacityPlanningPoolCheckboxes();
+        resetCapacityPlanningResults();
+    }
+
+    function populateCapacityPlanningPoolCheckboxes() {
+        const container = document.getElementById('capacityPlanningPoolCheckboxes');
+        const machines = Array.from(selectedCapacityPlanningMachines);
+        
+        if (machines.length === 0) {
+            container.innerHTML = '';
+            return;
+        }
+        
+        // Collect all pools from selected machines
+        const allPools = [];
+        machines.forEach(machine => {
+            if (config[machine]) {
+                Object.keys(config[machine]).forEach(pool => {
+                    allPools.push({ machine, pool, label: `${machine} - ${pool}` });
+                });
+            }
+        });
+        
+        // If no pools selected yet, select all by default
+        if (selectedCapacityPlanningPools.size === 0) {
+            allPools.forEach(p => selectedCapacityPlanningPools.add(`${p.machine}:${p.pool}`));
+        }
+        
+        container.innerHTML = allPools.map(p => {
+            const key = `${p.machine}:${p.pool}`;
+            return `<div class="checkbox-item"><input type="checkbox" ${selectedCapacityPlanningPools.has(key) ? 'checked' : ''} value="${key}" onchange="updateCapacityPlanningPoolSelection(this)"> <span>${p.label}</span></div>`;
+        }).join('');
     }
 
     function updateCapacityPlanningPoolSelection(checkbox) {
@@ -1117,6 +1168,7 @@
         } else {
             selectedCapacityPlanningPools.delete(checkbox.value);
         }
+        resetCapacityPlanningResults();
     }
 
     function populateLparList() {
@@ -1626,6 +1678,53 @@
         });
     }
 
+    function calculateAnnualizedActualExceedanceMultiMachine(machinePoolsMap, referenceSizing, cpuUtilizationGrowthRate, years, dates) {
+        const sampledDayCount = dates.length || 0;
+        if (!sampledDayCount) {
+            return Array.from({ length: years }, () => ({ minutes: 0, cores: 0 }));
+        }
+
+        const annualizationFactor = sampledDayCount >= annualizationDays ? 1.0 : annualizationDays / sampledDayCount;
+
+        return Array.from({ length: years }, (_, yearIndex) => {
+            const growthMultiplier = Math.pow(1 + cpuUtilizationGrowthRate, yearIndex);
+            let totalExceededMinutes = 0;
+            let totalExceededCores = 0;
+
+            dates.forEach(d => {
+                const combined = Array(intervalsPerDay).fill(0);
+
+                // Sum intervals across selected machines and their selected pools
+                Object.keys(machinePoolsMap).forEach(machine => {
+                    if (!config[machine]) return;
+                    
+                    const pools = machinePoolsMap[machine];
+                    pools.forEach(p => {
+                        if (config[machine][p]) {
+                            config[machine][p].forEach(l => {
+                                const intervals = getLparStats(l, d).intervals;
+                                intervals.forEach((v, i) => combined[i] += v);
+                            });
+                        }
+                    });
+                });
+
+                combined.forEach(value => {
+                    const projectedValue = value * growthMultiplier;
+                    if (projectedValue > referenceSizing) {
+                        totalExceededMinutes += intervalMinutes;
+                        totalExceededCores += projectedValue - referenceSizing;
+                    }
+                });
+            });
+
+            return {
+                minutes: totalExceededMinutes * annualizationFactor,
+                cores: totalExceededCores * annualizationFactor
+            };
+        });
+    }
+
     function resetCapacityPlanningResults() {
         document.getElementById('capacityPlanningBaseValue').innerText = '0.00';
         document.getElementById('capacityPlanningObservedPeak').innerText = '0.00';
@@ -1634,19 +1733,18 @@
     }
 
     function updateCapacityPlanningTable() {
-        const machine = document.getElementById('capacityPlanningMachineSelect').value;
+        const selectedPoolKeys = Array.from(document.querySelectorAll('#capacityPlanningPoolCheckboxes input:checked')).map(i => i.value);
         const metric = document.getElementById('capacityPlanningMetricSelect').value;
         const basePlanningGrowthRate = (parseFloat(document.getElementById('capacityPlanningGrowthRate').value) || 0) / 100;
         const cpuUtilizationGrowthRate = (parseFloat(document.getElementById('cpuUtilizationGrowthRate').value) || 0) / 100;
         const years = parseInt(document.getElementById('capacityPlanningYearSelect').value, 10) || 1;
-        const pools = Array.from(document.querySelectorAll('#capacityPlanningPoolCheckboxes input:checked')).map(i => i.value);
         const resultsBody = document.getElementById('capacityPlanningResultsBody');
 
-        if (!config[machine] || !pools.length) {
+        if (!selectedPoolKeys.length) {
             document.getElementById('capacityPlanningBaseValue').innerText = '0.00';
             document.getElementById('capacityPlanningObservedPeak').innerText = '0.00';
             document.getElementById('capacityPlanningReferenceSizing').innerText = '0';
-            resultsBody.innerHTML = '<tr><td colspan="7">Select a machine and at least one CPU pool.</td></tr>';
+            resultsBody.innerHTML = '<tr><td colspan="7">Select at least one CPU pool.</td></tr>';
             return;
         }
 
@@ -1659,18 +1757,42 @@
             return;
         }
 
-        const dailyValues = getCapacityPlanningDailyValues(machine, pools, dates, metric);
-        const basePlanningValue = dailyValues.length ? Math.max(...dailyValues.map(item => item.planning)) : 0;
-        const observedActualPeak = dailyValues.length ? Math.max(...dailyValues.map(item => item.actualPeak)) : 0;
-        const referenceSizing = Math.ceil(basePlanningValue * Math.pow(1 + basePlanningGrowthRate, Math.max(years - 1, 0)));
+        // Parse selected pools by machine
+        const machinePoolsMap = {};
+        selectedPoolKeys.forEach(key => {
+            const [machine, pool] = key.split(':');
+            if (!machinePoolsMap[machine]) {
+                machinePoolsMap[machine] = [];
+            }
+            machinePoolsMap[machine].push(pool);
+        });
 
-        document.getElementById('capacityPlanningBaseValue').innerText = basePlanningValue.toFixed(2);
-        document.getElementById('capacityPlanningObservedPeak').innerText = observedActualPeak.toFixed(2);
+        // Calculate values for each machine and sum them
+        let totalBasePlanningValue = 0;
+        let totalObservedActualPeak = 0;
+        
+        Object.keys(machinePoolsMap).forEach(machine => {
+            if (!config[machine]) return;
+            
+            const pools = machinePoolsMap[machine];
+            
+            const dailyValues = getCapacityPlanningDailyValues(machine, pools, dates, metric);
+            const machineBasePlanningValue = dailyValues.length ? Math.max(...dailyValues.map(item => item.planning)) : 0;
+            const machineObservedActualPeak = dailyValues.length ? Math.max(...dailyValues.map(item => item.actualPeak)) : 0;
+            
+            totalBasePlanningValue += machineBasePlanningValue;
+            totalObservedActualPeak += machineObservedActualPeak;
+        });
+
+        const referenceSizing = Math.ceil(totalBasePlanningValue * Math.pow(1 + basePlanningGrowthRate, Math.max(years - 1, 0)));
+
+        document.getElementById('capacityPlanningBaseValue').innerText = totalBasePlanningValue.toFixed(2);
+        document.getElementById('capacityPlanningObservedPeak').innerText = totalObservedActualPeak.toFixed(2);
         document.getElementById('capacityPlanningReferenceSizing').innerText = referenceSizing.toLocaleString();
 
-        const annualizedActualExceedance = calculateAnnualizedActualExceedance(machine, pools, referenceSizing, cpuUtilizationGrowthRate, years, dates, 'actual');
+        const annualizedActualExceedance = calculateAnnualizedActualExceedanceMultiMachine(machinePoolsMap, referenceSizing, cpuUtilizationGrowthRate, years, dates);
 
-        resultsBody.innerHTML = buildCapacityPlanningRows(observedActualPeak, referenceSizing, years, cpuUtilizationGrowthRate, annualizedActualExceedance);
+        resultsBody.innerHTML = buildCapacityPlanningRows(totalObservedActualPeak, referenceSizing, years, cpuUtilizationGrowthRate, annualizedActualExceedance);
     }
 
     function initChart(labels, datasets, isLparMultiDay = false, isComparison = false) {
