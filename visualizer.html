@@ -434,7 +434,7 @@
         .pool-card h4 { margin: 0 0 16px; font-size: 1.25rem; line-height: 1.4; font-weight: 400; color: var(--cds-text-primary); border-bottom: none; padding-bottom: 0; }
         .pool-stat-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; padding-top: 16px; border-top: 1px solid var(--cds-border-subtle); }
         .pool-sub-label { font-size: 0.75rem; font-weight: 400; color: var(--cds-text-secondary); line-height: 1.33; letter-spacing: 0.32px; text-transform: uppercase; }
-        .pool-sub-val { font-size: 1.5rem; font-weight: 400; color: var(--cds-text-primary); margin-top: 4px; }
+        .pool-sub-val { font-size: 1.25rem; font-weight: 400; color: var(--cds-text-primary); margin-top: 4px; }
         .pool-sub-date { font-size: 0.75rem; color: var(--cds-text-helper); margin-top: 4px; line-height: 1.33; letter-spacing: 0.32px; }
 
         .chart-container {
@@ -611,10 +611,12 @@
                     <option value="p80">P80</option><option value="p70">P70</option><option value="p60">P60</option>
                     <option value="p50">P50</option><option value="Avg">Average</option>
                 </select></div>
-                <div class="field-group control-item"><label for="aggregationModeSelect">Aggregation mode</label><select id="aggregationModeSelect" onchange="aggregationMode = this.value; updateMachineChart()" title="Capacity Planning: Sum each LPAR's metric within the same day. Actual Usage: Calculate metric from combined intervals (real peak). Capacity Planning (different day): Sum each pool's best metric across different days.">
+                <div class="field-group control-item"><label for="aggregationModeSelect">Aggregation mode</label><select id="aggregationModeSelect" onchange="aggregationMode = this.value; updateMachineChart()" title="Capacity Planning: Sum each LPAR's metric within the same day. Capacity Planning (LPAR daily metric): Use each LPAR's selected daily metric and sum by day independent of pool. Actual Usage: Calculate metric from combined intervals (real peak). Capacity Planning (different day): Sum each pool's best metric across different days. Capacity Planning (LPAR different days): Sum each LPAR's best metric across different days.">
                     <option value="actual">Actual usage</option>
                     <option value="capacity">Capacity planning (sum of metrics)</option>
+                    <option value="capacityLparMax">Capacity planning (sum of LPAR daily metric)</option>
                     <option value="capacityDifferentDay">Capacity Planning (sum of metrics from different day)</option>
+                    <option value="capacityLparDifferentDay">Capacity planning (sum of LPAR different days)</option>
                 </select></div>
                 <div class="field-group control-item"></div>
                 <div class="field-group control-item"><label for="startDateSelect">Start date</label><input type="date" id="startDateSelect" onchange="updateMachineChart()" title="Select start date for data range (leave empty for all dates)"></div>
@@ -626,6 +628,12 @@
                 </div>
             </div>
 
+            <div id="exceedResultsContainer" class="hidden" style="margin-top: 24px;">
+                <button id="calculateExceedBtn" class="primary-button" onclick="calculateAndShowExceedStatistics()" style="margin-bottom: 16px;">
+                    Calculate Capacity Planning Exceed Statistics
+                </button>
+            </div>
+            
             <div id="exceedResults" class="exceed-results hidden">
                 <h3 class="section-title" style="margin-bottom: 0;">Capacity planning exceed statistics</h3>
                 <div class="exceed-grid">
@@ -675,7 +683,7 @@
                 </div>
             </div>
             <div style="margin-top: 24px;">
-                <div class="section-title">Individual pool performance</div>
+                <div class="section-title" id="poolBreakdownTitle">Individual pool performance</div>
                 <p class="band-description" id="poolPerformanceDescription">LPAR maximum can come from different intervals within the same day.</p>
                 <div id="poolBreakdown" class="pool-breakdown"></div>
             </div>
@@ -894,7 +902,7 @@
                         intervalMinutes = parseInt(val.trim()) || 5;
                         intervalsPerDay = (24 * 60) / intervalMinutes;
                     }
-                } else config[currentSection][key.trim()] = val.trim().split(',').map(s => s.trim());
+                } else config[currentSection][key.trim()] = val.trim().split(',').map(s => s.trim().toUpperCase());
             }
         });
         updateSelectors();
@@ -1196,42 +1204,61 @@
         const pools = Array.from(document.querySelectorAll('#poolCheckboxes input:checked')).map(i => i.value);
         const dates = getFilteredDates();
         const poolContainer = document.getElementById('poolBreakdown'); poolContainer.innerHTML = "";
+        const isCapacityMode = aggregationMode === 'capacity';
+        const isCapacityLparMaxMode = aggregationMode === 'capacityLparMax';
+        const isCapacityDifferentDayMode = aggregationMode === 'capacityDifferentDay';
+        const isCapacityLparDifferentDayMode = aggregationMode === 'capacityLparDifferentDay';
         
-        const shouldShowExceedResults = met.startsWith('p') && (aggregationMode === 'capacity' || aggregationMode === 'capacityDifferentDay');
-        document.getElementById('exceedResults').classList.toggle('hidden', !shouldShowExceedResults);
-        document.querySelector('.chart-band').classList.toggle('hidden', currentTab === 'machine' && aggregationMode === 'capacityDifferentDay');
+        const shouldShowExceedButton = met.startsWith('p') && (isCapacityMode || isCapacityDifferentDayMode || isCapacityLparMaxMode || isCapacityLparDifferentDayMode);
+        document.getElementById('exceedResultsContainer').classList.toggle('hidden', !shouldShowExceedButton);
+        document.getElementById('exceedResults').classList.add('hidden');
+        document.querySelector('.chart-band').classList.toggle('hidden', currentTab === 'machine' && (isCapacityDifferentDayMode || isCapacityLparDifferentDayMode));
         
         if (!config[m] || dates.length === 0 || pools.length === 0) return;
 
-        const datasets = pools.map((p, idx) => {
-            let daily;
-            if (aggregationMode === 'capacity' || aggregationMode === 'capacityDifferentDay') {
-                // Capacity Planning: Sum of individual LPAR metrics
-                daily = dates.map(d => config[m][p].reduce((s, l) => s + getLparStats(l, d)[met], 0));
-            } else {
-                // Actual Usage: Metric of combined intervals
-                daily = dates.map(d => {
-                    const combined = Array(intervalsPerDay).fill(0);
-                    config[m][p].forEach(l => {
-                        const intervals = getLparStats(l, d).intervals;
-                        intervals.forEach((v, i) => combined[i] += v);
-                    });
-                    if (met === "Max") return Math.max(...combined);
-                    else if (met === "Avg") return combined.reduce((a, b) => a + b, 0) / intervalsPerDay;
-                    else if (met.startsWith('p')) return calculatePercentile(combined, parseInt(met.substring(1)) / 100);
-                    return 0;
-                });
+        const formatIntervalTime = (index) => {
+            const intervalsPerHour = 60 / intervalMinutes;
+            const hour = Math.floor(index / intervalsPerHour);
+            const minute = (index % intervalsPerHour) * intervalMinutes;
+            return `${hour}:${minute.toString().padStart(2, '0')}`;
+        };
+
+        const getPoolActualDailyValues = (pool) => dates.map(d => {
+            const combined = Array(intervalsPerDay).fill(0);
+            config[m][pool].forEach(l => {
+                const intervals = getLparStats(l, d).intervals;
+                intervals.forEach((v, i) => combined[i] += v);
+            });
+            if (met === "Max") return Math.max(...combined);
+            else if (met === "Avg") return combined.reduce((a, b) => a + b, 0) / intervalsPerDay;
+            else if (met.startsWith('p')) return calculatePercentile(combined, parseInt(met.substring(1)) / 100);
+            return 0;
+        });
+
+        const getLparMetricForDate = (lpar, date) => {
+            const stats = getLparStats(lpar, date);
+            if (isCapacityLparMaxMode || isCapacityLparDifferentDayMode) {
+                if (met === "Max") return stats.intervals.length ? Math.max(...stats.intervals) : 0;
+                if (met === "Avg") return stats.intervals.length ? stats.intervals.reduce((a, b) => a + b, 0) / intervalsPerDay : 0;
+                if (met.startsWith('p')) return stats.intervals.length ? calculatePercentile(stats.intervals, parseInt(met.substring(1)) / 100) : 0;
+                return 0;
             }
+            return stats[met];
+        };
+
+        const poolDatasets = pools.map((p, idx) => {
+            let daily;
+            if (isCapacityMode || isCapacityDifferentDayMode || isCapacityLparMaxMode || isCapacityLparDifferentDayMode) {
+                daily = dates.map(d => config[m][p].reduce((s, l) => s + getLparMetricForDate(l, d), 0));
+            } else {
+                daily = getPoolActualDailyValues(p);
+            }
+
             const minV = Math.min(...daily), maxV = Math.max(...daily);
             const minD = dates[daily.indexOf(minV)], maxD = dates[daily.indexOf(maxV)];
-            const formatIntervalTime = (index) => {
-                const intervalsPerHour = 60 / intervalMinutes;
-                const hour = Math.floor(index / intervalsPerHour);
-                const minute = (index % intervalsPerHour) * intervalMinutes;
-                return `${hour}:${minute.toString().padStart(2, '0')}`;
-            };
             let minDisplayDate = minD;
             let maxDisplayDate = maxD;
+
             if (aggregationMode === 'actual') {
                 const getPoolCombinedIntervalsForDate = (date) => {
                     const combined = Array(intervalsPerDay).fill(0);
@@ -1246,6 +1273,7 @@
                 minDisplayDate = `${minD} ${formatIntervalTime(minIntervals.indexOf(Math.min(...minIntervals)))}`;
                 maxDisplayDate = `${maxD} ${formatIntervalTime(maxIntervals.indexOf(Math.max(...maxIntervals)))}`;
             }
+
             const card = document.createElement('div'); card.className = 'pool-card';
             card.innerHTML = `<h4>Pool: ${p}</h4><div class="pool-stat-grid">
                 <div><div class="pool-sub-label">Min</div><div class="pool-sub-val">${minV.toFixed(2)}</div><div class="pool-sub-date">${minDisplayDate}</div></div>
@@ -1254,17 +1282,45 @@
             return { label: p, backgroundColor: getMachineChartColor(idx), data: daily };
         });
 
+        const poolBreakdownTitle = document.getElementById('poolBreakdownTitle');
+        let stackedDatasets = poolDatasets;
+        if (isCapacityLparMaxMode || isCapacityLparDifferentDayMode) {
+            const lparDatasets = [];
+            let lparIndex = 0;
+            poolContainer.innerHTML = "";
+            if (poolBreakdownTitle) {
+                poolBreakdownTitle.innerText = 'Individual LPAR performance';
+            }
+            pools.forEach(pool => {
+                config[m][pool].forEach(lpar => {
+                    const daily = dates.map(d => getLparMetricForDate(lpar, d));
+                    const minV = Math.min(...daily), maxV = Math.max(...daily);
+                    const minD = dates[daily.indexOf(minV)], maxD = dates[daily.indexOf(maxV)];
+                    const card = document.createElement('div'); card.className = 'pool-card';
+                    card.innerHTML = `<h4>LPAR: ${lpar}</h4><div class="pool-stat-grid">
+                        <div><div class="pool-sub-label">Pool</div><div class="pool-sub-val" style="font-size: 1rem;">${pool}</div><div class="pool-sub-date">${minD}</div></div>
+                        <div><div class="pool-sub-label">Max</div><div class="pool-sub-val">${maxV.toFixed(2)}</div><div class="pool-sub-date">${maxD}</div></div></div>`;
+                    poolContainer.appendChild(card);
+                    lparDatasets.push({
+                        label: `${pool} / ${lpar}`,
+                        backgroundColor: getMachineChartColor(lparIndex++),
+                        data: daily
+                    });
+                });
+            });
+            stackedDatasets = lparDatasets;
+        } else if (poolBreakdownTitle) {
+            poolBreakdownTitle.innerText = 'Individual pool performance';
+        }
+
         let machineDaily;
-        if (aggregationMode === 'capacity') {
-            // Sum pool values for each date
-            machineDaily = dates.map(d => pools.reduce((s, p) => s + datasets[pools.indexOf(p)].data[dates.indexOf(d)], 0));
-        } else if (aggregationMode === 'capacityDifferentDay') {
-            // Sum each pool's independent daily values; machine min/max become sum of pool min/max across different days
-            const poolMinSum = datasets.reduce((sum, dataset) => sum + Math.min(...dataset.data), 0);
-            const poolMaxSum = datasets.reduce((sum, dataset) => sum + Math.max(...dataset.data), 0);
-            machineDaily = [poolMinSum, poolMaxSum];
+        if (isCapacityMode || isCapacityLparMaxMode) {
+            machineDaily = dates.map((d, dateIndex) => stackedDatasets.reduce((sum, dataset) => sum + (dataset.data[dateIndex] || 0), 0));
+        } else if (isCapacityDifferentDayMode || isCapacityLparDifferentDayMode) {
+            const lparMinSum = stackedDatasets.reduce((sum, dataset) => sum + Math.min(...dataset.data), 0);
+            const lparMaxSum = stackedDatasets.reduce((sum, dataset) => sum + Math.max(...dataset.data), 0);
+            machineDaily = [lparMinSum, lparMaxSum];
         } else {
-            // Actual Usage: Combine all LPARs across all pools, then calculate metric
             machineDaily = dates.map(d => {
                 const combined = Array(intervalsPerDay).fill(0);
                 pools.forEach(p => {
@@ -1279,14 +1335,14 @@
                 return 0;
             });
         }
+
         const mMin = Math.min(...machineDaily), mMax = Math.max(...machineDaily);
         document.getElementById('statMin').innerText = mMin.toFixed(2);
         document.getElementById('statMax').innerText = mMax.toFixed(2);
         
-        const modeLabel = aggregationMode === 'actual' ? 'Of Sums' : 'Sum of';
+        const modeLabel = aggregationMode === 'actual' ? 'Of Sums' : (aggregationMode === 'capacityLparMax' || aggregationMode === 'capacityLparDifferentDay') ? 'Sum of LPAR Daily Max' : 'Sum of';
         const poolPerformanceDescription = document.getElementById('poolPerformanceDescription');
-        if (aggregationMode === 'capacity') {
-            // Capacity Planning: Values come from a single day, but may combine different intervals
+        if (isCapacityMode) {
             const capacityTimingLabel = 'Single day, multiple intervals';
             document.getElementById('statMinDate').innerText = capacityTimingLabel;
             document.getElementById('statMaxDate').innerText = capacityTimingLabel;
@@ -1295,7 +1351,15 @@
             if (poolPerformanceDescription) {
                 poolPerformanceDescription.innerText = 'LPAR maximum can come from different intervals within the same day.';
             }
-        } else if (aggregationMode === 'capacityDifferentDay') {
+        } else if (isCapacityLparMaxMode) {
+            document.getElementById('statMinDate').innerText = 'Single day, LPAR maxima';
+            document.getElementById('statMaxDate').innerText = 'Single day, LPAR maxima';
+            document.getElementById('statMinLabel').innerText = dates[machineDaily.indexOf(mMin)] || '-';
+            document.getElementById('statMaxLabel').innerText = dates[machineDaily.indexOf(mMax)] || '-';
+            if (poolPerformanceDescription) {
+                poolPerformanceDescription.innerText = 'Each day sums the maximum interval from every selected LPAR, independent of pool.';
+            }
+        } else if (isCapacityDifferentDayMode) {
             document.getElementById('statMinDate').innerText = 'Different days by pool';
             document.getElementById('statMaxDate').innerText = 'Different days by pool';
             document.getElementById('statMinLabel').innerText = 'Independent pool minima';
@@ -1303,16 +1367,17 @@
             if (poolPerformanceDescription) {
                 poolPerformanceDescription.innerText = 'Pool maximum can come from different days and different intervals.';
             }
+        } else if (isCapacityLparDifferentDayMode) {
+            document.getElementById('statMinDate').innerText = 'Different days by LPAR';
+            document.getElementById('statMaxDate').innerText = 'Different days by LPAR';
+            document.getElementById('statMinLabel').innerText = 'Sum of LPAR minima';
+            document.getElementById('statMaxLabel').innerText = 'Sum of LPAR maxima';
+            if (poolPerformanceDescription) {
+                poolPerformanceDescription.innerText = 'Each LPAR maximum can come from different days and different intervals.';
+            }
         } else {
             document.getElementById('statMinLabel').innerText = 'Cores';
             document.getElementById('statMaxLabel').innerText = 'Cores';
-            // Actual Usage: Date/time is meaningful since it's the simultaneous peak moment
-            const formatIntervalTime = (index) => {
-                const intervalsPerHour = 60 / intervalMinutes;
-                const hour = Math.floor(index / intervalsPerHour);
-                const minute = (index % intervalsPerHour) * intervalMinutes;
-                return `${hour}:${minute.toString().padStart(2, '0')}`;
-            };
             const machineMinDate = dates[machineDaily.indexOf(mMin)];
             const machineMaxDate = dates[machineDaily.indexOf(mMax)];
             const getCombinedIntervalsForDate = (date) => {
@@ -1338,14 +1403,7 @@
         
         document.getElementById('minLabel').innerText = `MACHINE MIN (${met.toUpperCase()} - ${modeLabel})`;
         document.getElementById('maxLabel').innerText = `MACHINE MAX (${met.toUpperCase()} - ${modeLabel})`;
-        if (shouldShowExceedResults) {
-            calculatePercentileExceedStats();
-        } else {
-            const resultsDiv = document.getElementById('exceedResults');
-            const existingThreshold = resultsDiv.querySelector('.threshold-info');
-            if (existingThreshold) existingThreshold.remove();
-        }
-        if (aggregationMode === 'capacityDifferentDay') {
+        if (isCapacityDifferentDayMode) {
             if (chart) {
                 chart.destroy();
                 chart = null;
@@ -1353,9 +1411,7 @@
             return;
         }
         
-        // Handle different visualization modes
         if (machineVisualizationMode === 'comparison') {
-            // Comparison view: Show actual vs selected metric
             const actualDaily = dates.map(d => {
                 const combined = Array(intervalsPerDay).fill(0);
                 pools.forEach(p => {
@@ -1368,15 +1424,20 @@
             });
             
             let metricDaily;
-            if (aggregationMode === 'capacity' || aggregationMode === 'capacityDifferentDay') {
-                // Capacity Planning: Sum of individual LPAR metrics
-                metricDaily = dates.map(d => pools.reduce((sum, p) => {
-                    return sum + config[m][p].reduce((lparSum, l) => {
-                        return lparSum + getLparStats(l, d)[met];
+            if (isCapacityMode || isCapacityDifferentDayMode || isCapacityLparMaxMode || isCapacityLparDifferentDayMode) {
+                metricDaily = dates.map(d => {
+                    if (isCapacityLparMaxMode || isCapacityLparDifferentDayMode) {
+                        return pools.reduce((sum, p) => sum + config[m][p].reduce((lparSum, l) => {
+                            return lparSum + getLparMetricForDate(l, d);
+                        }, 0), 0);
+                    }
+                    return pools.reduce((sum, p) => {
+                        return sum + config[m][p].reduce((lparSum, l) => {
+                            return lparSum + getLparStats(l, d)[met];
+                        }, 0);
                     }, 0);
-                }, 0));
+                });
             } else {
-                // Actual Usage: Metric of combined intervals
                 metricDaily = dates.map(d => {
                     const combined = Array(intervalsPerDay).fill(0);
                     pools.forEach(p => {
@@ -1392,11 +1453,14 @@
                 });
             }
             
-            // Create descriptive aggregation mode label
-            const aggregationModeLabel = aggregationMode === 'capacity'
+            const aggregationModeLabel = isCapacityMode
                 ? 'Capacity planning (sum of metrics)'
-                : aggregationMode === 'capacityDifferentDay'
+                : isCapacityLparMaxMode
+                ? 'Capacity planning (sum of LPAR daily metric)'
+                : isCapacityDifferentDayMode
                 ? 'Capacity Planning (sum of metrics from different day)'
+                : isCapacityLparDifferentDayMode
+                ? 'Capacity planning (sum of LPAR different days)'
                 : 'Actual usage (metric of sums)';
             
             const comparisonDatasets = [
@@ -1426,8 +1490,7 @@
             
             initChart(dates, comparisonDatasets, false, false);
         } else {
-            // Stacked view: Original behavior
-            initChart(dates, datasets);
+            initChart(dates, stackedDatasets);
         }
     }
 
@@ -1875,13 +1938,17 @@
         });
     }
 
+    function calculateAndShowExceedStatistics() {
+        calculatePercentileExceedStats();
+    }
+
     function calculatePercentileExceedStats() {
         const m = document.getElementById('machineSelect').value;
         const met = document.getElementById('metricSelect').value;
         const pools = Array.from(document.querySelectorAll('#poolCheckboxes input:checked')).map(i => i.value);
         const dates = getFilteredDates();
         
-        if (!config[m] || dates.length === 0 || pools.length === 0 || !met.startsWith('p') || (aggregationMode !== 'capacity' && aggregationMode !== 'capacityDifferentDay')) {
+        if (!config[m] || dates.length === 0 || pools.length === 0 || !met.startsWith('p') || (aggregationMode !== 'capacity' && aggregationMode !== 'capacityDifferentDay' && aggregationMode !== 'capacityLparMax' && aggregationMode !== 'capacityLparDifferentDay')) {
             return;
         }
         
@@ -1901,6 +1968,36 @@
             });
             maxCapacityPlanning = Math.max(...capacityPlanningValues);
             maxCapacityDate = dates[capacityPlanningValues.indexOf(maxCapacityPlanning)];
+        } else if (aggregationMode === 'capacityLparMax') {
+            const capacityPlanningValues = dates.map(d => {
+                return pools.reduce((sum, p) => {
+                    return sum + config[m][p].reduce((lparSum, l) => {
+                        const stats = getLparStats(l, d);
+                        const metricValue = calculatePercentile(stats.intervals, percentileValue);
+                        return lparSum + metricValue;
+                    }, 0);
+                }, 0);
+            });
+            maxCapacityPlanning = Math.max(...capacityPlanningValues);
+            maxCapacityDate = dates[capacityPlanningValues.indexOf(maxCapacityPlanning)];
+        } else if (aggregationMode === 'capacityLparDifferentDay') {
+            // Sum each LPAR's maximum across all dates (different days per LPAR)
+            const allLpars = [];
+            pools.forEach(p => {
+                config[m][p].forEach(l => {
+                    allLpars.push(l);
+                });
+            });
+            
+            maxCapacityPlanning = allLpars.reduce((sum, lpar) => {
+                const lparDailyValues = dates.map(d => {
+                    const stats = getLparStats(lpar, d);
+                    return calculatePercentile(stats.intervals, percentileValue);
+                });
+                const lparMax = lparDailyValues.length ? Math.max(...lparDailyValues) : 0;
+                return sum + lparMax;
+            }, 0);
+            maxCapacityDate = 'Different days by LPAR';
         } else {
             maxCapacityPlanning = pools.reduce((sum, p) => {
                 const poolDailyValues = dates.map(d => {
