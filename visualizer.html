@@ -267,6 +267,19 @@
 
         .control-item { grid-column: span 3; }
         .control-item-wide { grid-column: span 6; }
+        .capacity-planning-row {
+            grid-column: span 12;
+            display: grid;
+            grid-template-columns: repeat(12, minmax(0, 1fr));
+            gap: 16px;
+            justify-items: start;
+        }
+        .capacity-planning-row .field-group {
+            width: 100%;
+        }
+        .capacity-planning-row .control-item {
+            grid-column: span 3;
+        }
 
         .checkbox-group {
             display: grid;
@@ -716,37 +729,42 @@
                     <label>Select machines</label>
                     <div id="capacityPlanningMachineCheckboxes" class="checkbox-group"></div>
                 </div>
-                <div class="field-group control-item"><label for="capacityPlanningMetricSelect">Capacity planning metric</label><select id="capacityPlanningMetricSelect" onchange="resetCapacityPlanningResults()">
-                    <option value="Max">Max - Sum of metrics</option>
-                    <option value="MaxDifferentDay">Max - Sum of metrics from different day</option>
-                    <option value="p95">P95 - Sum of metrics</option>
-                    <option value="p95DifferentDay">P95 - Sum of metrics from different day</option>
-                    <option value="p90">P90 - Sum of metrics</option>
-                    <option value="p90DifferentDay">P90 - Sum of metrics from different day</option>
-                    <option value="p80">P80 - Sum of metrics</option>
-                    <option value="p80DifferentDay">P80 - Sum of metrics from different day</option>
-                    <option value="p50">P50 capacity planning</option>
-                    <option value="Avg">Average capacity planning</option>
-                </select></div>
-                <div class="field-group control-item"><label for="capacityPlanningYearSelect">Number of years for CPU capacity planning</label><select id="capacityPlanningYearSelect" onchange="resetCapacityPlanningResults()">
-                    <option value="1">1 year</option>
-                    <option value="2">2 years</option>
-                    <option value="3">3 years</option>
-                    <option value="4">4 years</option>
-                    <option value="5">5 years</option>
-                </select></div>
-                <div class="field-group control-item"><label for="cpuUtilizationYearSelect">Number of years for CPU utilization planning</label><select id="cpuUtilizationYearSelect" onchange="resetCapacityPlanningResults()">
-                    <option value="1">1 year</option>
-                    <option value="2">2 years</option>
-                    <option value="3">3 years</option>
-                    <option value="4">4 years</option>
-                    <option value="5">5 years</option>
-                </select></div>
-                <div class="field-group control-item"></div>
-                <div class="field-group control-item"><label for="capacityPlanningGrowthRate">Base planning growth (%)</label><input type="number" id="capacityPlanningGrowthRate" min="0" step="0.1" value="5" onchange="resetCapacityPlanningResults()" oninput="resetCapacityPlanningResults()"></div>
-                <div class="field-group control-item"><label for="cpuUtilizationGrowthRate">CPU utilization growth (%)</label><input type="number" id="cpuUtilizationGrowthRate" min="0" step="0.1" value="5" onchange="resetCapacityPlanningResults()" oninput="resetCapacityPlanningResults()"></div>
-                <div class="field-group control-item"></div>
-                <div class="field-group control-item"></div>
+                <div class="capacity-planning-row">
+                    <div class="field-group control-item"><label for="capacityPlanningMetricSelect">Metric selection</label><select id="capacityPlanningMetricSelect" onchange="resetCapacityPlanningResults()">
+                        <option value="Max">Max</option>
+                        <option value="p95">P95</option>
+                        <option value="p90">P90</option>
+                        <option value="p80">P80</option>
+                        <option value="p70">P70</option>
+                        <option value="p60">P60</option>
+                        <option value="p50">P50</option>
+                        <option value="Avg">Average</option>
+                    </select></div>
+                    <div class="field-group control-item"><label for="capacityPlanningAggregationModeSelect">Aggregation mode</label><select id="capacityPlanningAggregationModeSelect" onchange="resetCapacityPlanningResults()">
+                        <option value="sameDay">Sum of metrics</option>
+                        <option value="differentDay">Sum of metrics from different day</option>
+                    </select></div>
+                </div>
+                <div class="capacity-planning-row">
+                    <div class="field-group control-item"><label for="capacityPlanningYearSelect">Number of years for CPU capacity planning</label><select id="capacityPlanningYearSelect" onchange="resetCapacityPlanningResults()">
+                        <option value="1">1 year</option>
+                        <option value="2">2 years</option>
+                        <option value="3">3 years</option>
+                        <option value="4">4 years</option>
+                        <option value="5">5 years</option>
+                    </select></div>
+                    <div class="field-group control-item"><label for="capacityPlanningGrowthRate">Base planning growth (%)</label><input type="number" id="capacityPlanningGrowthRate" min="0" step="0.1" value="5" onchange="resetCapacityPlanningResults()" oninput="resetCapacityPlanningResults()"></div>
+                </div>
+                <div class="capacity-planning-row">
+                    <div class="field-group control-item"><label for="cpuUtilizationYearSelect">Number of years for CPU utilization planning</label><select id="cpuUtilizationYearSelect" onchange="resetCapacityPlanningResults()">
+                        <option value="1">1 year</option>
+                        <option value="2">2 years</option>
+                        <option value="3">3 years</option>
+                        <option value="4">4 years</option>
+                        <option value="5">5 years</option>
+                    </select></div>
+                    <div class="field-group control-item"><label for="cpuUtilizationGrowthRate">CPU utilization growth (%)</label><input type="number" id="cpuUtilizationGrowthRate" min="0" step="0.1" value="5" onchange="resetCapacityPlanningResults()" oninput="resetCapacityPlanningResults()"></div>
+                </div>
                 <div class="field-group" style="grid-column: span 12;">
                     <label>CPU pools</label>
                     <div id="capacityPlanningPoolCheckboxes" class="checkbox-group"></div>
@@ -1803,7 +1821,9 @@
 
     function updateCapacityPlanningTable() {
         const selectedPoolKeys = Array.from(document.querySelectorAll('#capacityPlanningPoolCheckboxes input:checked')).map(i => i.value);
-        const metric = document.getElementById('capacityPlanningMetricSelect').value;
+        const metricSelection = document.getElementById('capacityPlanningMetricSelect').value;
+        const aggregationMode = document.getElementById('capacityPlanningAggregationModeSelect').value;
+        const metric = aggregationMode === 'differentDay' ? `${metricSelection}DifferentDay` : metricSelection;
         const basePlanningGrowthRate = (parseFloat(document.getElementById('capacityPlanningGrowthRate').value) || 0) / 100;
         const cpuUtilizationGrowthRate = (parseFloat(document.getElementById('cpuUtilizationGrowthRate').value) || 0) / 100;
         const capacityPlanningYears = parseInt(document.getElementById('capacityPlanningYearSelect').value, 10) || 1;
