@@ -26,7 +26,8 @@ try:
     DATA_DIR = config['MAIN'].get('DATA_DIR', 'data-internal')
     BASE_PLANNING_GROWTH = float(config['MAIN'].get('BASE_PLANNING_GROWTH', '5'))
     CPU_UTILIZATION_GROWTH = float(config['MAIN'].get('CPU_UTILIZATION_GROWTH', '5'))
-    NUM_OF_YEAR = int(config['MAIN'].get('NUM_OF_YEAR', '5'))
+    CAPACITY_PLANNING_YEARS = int(config['MAIN'].get('CAPACITY_PLANNING_YEARS', '5'))
+    CPU_UTILIZATION_YEARS = int(config['MAIN'].get('CPU_UTILIZATION_YEARS', '5'))
     REFERENCE_CORE = float(config['MAIN'].get('REFERENCE_CORE', '47'))
     ANNUALIZATION_DAYS = int(config['MAIN'].get('ANNUALIZATION_DAYS', '365'))
 except Exception as e:
@@ -54,7 +55,8 @@ print(f"  Standby value: {STANDBY} cores")
 print(f"  Interval: {INTERVAL} minutes")
 print(f"  Base planning growth: {BASE_PLANNING_GROWTH}%")
 print(f"  CPU utilization growth: {CPU_UTILIZATION_GROWTH}%")
-print(f"  Number of years: {NUM_OF_YEAR}")
+print(f"  Capacity planning years: {CAPACITY_PLANNING_YEARS}")
+print(f"  CPU utilization years: {CPU_UTILIZATION_YEARS}")
 print(f"  Reference sizing: {REFERENCE_CORE} cores")
 print(f"  Annualization days: {ANNUALIZATION_DAYS}")
 print()
@@ -142,18 +144,22 @@ base_planning_growth_rate = BASE_PLANNING_GROWTH / 100
 cpu_utilization_growth_rate = CPU_UTILIZATION_GROWTH / 100
 yearly_exceedances = {}
 
+# Use REFERENCE_CORE from config as the base planning value
+base_planning_value = REFERENCE_CORE
+
 # Calculate reference sizing from base planning value with growth
-calculated_reference_sizing = calculated_base_planning_value * ((1 + base_planning_growth_rate) ** max(NUM_OF_YEAR - 1, 0))
+calculated_reference_sizing = base_planning_value * ((1 + base_planning_growth_rate) ** max(CAPACITY_PLANNING_YEARS - 1, 0))
 
-# Use REFERENCE_CORE from config (allows manual override)
-reference_sizing = REFERENCE_CORE
+# Round up the calculated reference sizing (matching visualizer behavior)
+reference_sizing = int(calculated_reference_sizing + 0.999999)  # Equivalent to Math.ceil()
 
-print(f"Base planning value (from data): {calculated_base_planning_value:.2f} cores")
-print(f"Calculated reference sizing (Year {NUM_OF_YEAR}): {calculated_reference_sizing:.2f} cores")
-print(f"Using reference sizing from config: {reference_sizing:.2f} cores")
+print(f"Base planning value (from config): {base_planning_value:.2f} cores")
+print(f"Calculated base planning value (from data): {calculated_base_planning_value:.2f} cores")
+print(f"Calculated reference sizing (using {CAPACITY_PLANNING_YEARS} years): {calculated_reference_sizing:.2f} cores")
+print(f"Reference sizing (rounded up): {reference_sizing} cores")
 print()
 
-for year in range(1, NUM_OF_YEAR + 1):
+for year in range(1, CPU_UTILIZATION_YEARS + 1):
     growth_multiplier_year = (1 + cpu_utilization_growth_rate) ** (year - 1)
     
     exceedances = []
@@ -218,7 +224,7 @@ for year in range(1, NUM_OF_YEAR + 1):
 print("=" * 80)
 
 # Write CSV files for each year
-for year in range(1, NUM_OF_YEAR + 1):
+for year in range(1, CPU_UTILIZATION_YEARS + 1):
     exceedances = yearly_exceedances[year]
     filename = f'exceedances_year{year}.csv'
     
