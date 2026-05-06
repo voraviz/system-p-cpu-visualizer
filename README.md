@@ -83,9 +83,10 @@ cpu-utilization-visualizer/
 
 ### Machine Utilization View
 
--   **Dual Visualization Modes:**
+-   **Triple Visualization Modes:**
     -   **Stacked View:** Traditional stacked bar chart showing daily CPU utilization by pool with tooltip showing total cores
     -   **Comparison View:** Line graph comparing actual maximum usage against selected metric (e.g., P90, P95) with chosen aggregation method
+    -   **Projection View:** Line graph showing capacity projection based on machine rPerf values, displaying both current metric values and projected values for target machine performance
 -   **Date Range Selection:** Filter data by selecting start and end dates using calendar widgets. Default shows full date range (oldest to newest date).
 -   **Metric Selection:** Choose between Max, Average, or various Percentiles (P50, P60, P70, P80, P90, P95) for daily aggregation.
 -   **Aggregation Mode:** Select between Actual Usage, Capacity Planning (same day), and Capacity Planning (different day) calculation methods (see [Aggregation Modes](#aggregation-modes) below).
@@ -96,6 +97,12 @@ cpu-utilization-visualizer/
     -   **Days with Exceed:** Number of days containing at least one exceeding interval
     -   **Total Cores Exceeded:** Cumulative sum of cores exceeded across all intervals
     -   **Max Cores Exceeded:** Peak single-interval exceedance (worst moment)
+-   **Projection View Features:**
+    -   **rPerf-Based Projection:** Input current and target machine rPerf values to project capacity requirements
+    -   **Numeric Validation:** Accepts decimal values (e.g., 10.78, 27.3) for precise rPerf specifications
+    -   **Dynamic Calculation:** Projection multiplier = current rPerf / target rPerf, applied to selected metric values
+    -   **Dual-Line Visualization:** Shows both original metric values and projected values on the same line chart
+    -   **On-Demand Generation:** Chart updates only when "Generate Projection" button is clicked, clearing when metric or aggregation changes
 
 ### LPAR Utilization View
 
@@ -257,6 +264,12 @@ Recent interface updates in [visualizer.html](visualizer.html) include:
 - Updated Machine Utilization summary labels to distinguish `Single day, multiple intervals` from simultaneous peaks
 - Updated LPAR visualization to stacked rendering so the visible chart top matches the combined summary total
 - **Added Machine Utilization Comparison View:** New visualization sub-tab that displays a line graph comparing actual maximum usage against selected metric (P90, P95, Max, etc.) with chosen aggregation method, making it easier to visualize capacity planning thresholds versus actual usage patterns
+- **Added Machine Utilization Projection View:** New visualization sub-tab for rPerf-based capacity projection analysis:
+  - Input current and target machine rPerf values (e.g., 10.78, 27.3)
+  - Calculates projected capacity using formula: metric × (current rPerf / target rPerf)
+  - Displays line chart with both original and projected metric values
+  - Validates numeric inputs and clears chart when metric/aggregation changes
+  - Useful for sizing workloads when migrating between machines with different performance characteristics
 - Enhanced tooltips in Machine Utilization stacked view to show total cores when hovering over bars
 - Preserved original machine stacked-bar and LPAR line-chart color behavior for data clarity
 
