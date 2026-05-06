@@ -7,7 +7,7 @@
 [Machine Name]
 <CPU POOL NAME>=<LPAR1>,<LPAR2>,<LPAR3>,...
 ```
-- config.ini parser need to skips comment lines starting with #
+- config.ini parser need to skips comment lines starting with # or ;
 - CPU Utilization of each LPAR stored in folder data in CSV format
   - file name is LPAR name in lower characters with extension csv
   - each row is date in format mm/dd/yyyy

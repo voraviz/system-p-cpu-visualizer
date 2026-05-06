@@ -826,6 +826,26 @@
             <div id="machineVisualizationTabs" class="tabs" style="margin-top: 0; border-top: none;">
                 <button id="tabBtnMachineStacked" class="tab-btn active" onclick="switchMachineVisualization('stacked')">Stacked View</button>
                 <button id="tabBtnMachineComparison" class="tab-btn" onclick="switchMachineVisualization('comparison')">Comparison View</button>
+                <button id="tabBtnMachineProjection" class="tab-btn" onclick="switchMachineVisualization('projection')">Projection View</button>
+            </div>
+            
+            <!-- Projection View Controls -->
+            <div id="projectionControls" class="hidden" style="margin-top: 16px; padding: 16px; background: var(--cds-layer-01);">
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; align-items: end;">
+                    <div class="field-group">
+                        <label for="currentRPerf">Current machine rPerf</label>
+                        <input type="text" id="currentRPerf" placeholder="e.g., 10.78" style="width: 100%; height: 40px; padding: 0 16px; border: none; border-bottom: 2px solid var(--cds-border-subtle); background: var(--cds-field); color: var(--cds-text-primary);">
+                        <span id="currentRPerfError" style="color: var(--cds-support-error); font-size: 0.75rem; display: none;">Please enter a valid numeric value</span>
+                    </div>
+                    <div class="field-group">
+                        <label for="targetRPerf">Target machine rPerf</label>
+                        <input type="text" id="targetRPerf" placeholder="e.g., 27.63" style="width: 100%; height: 40px; padding: 0 16px; border: none; border-bottom: 2px solid var(--cds-border-subtle); background: var(--cds-field); color: var(--cds-text-primary);">
+                        <span id="targetRPerfError" style="color: var(--cds-support-error); font-size: 0.75rem; display: none;">Please enter a valid numeric value</span>
+                    </div>
+                    <div>
+                        <button class="primary-button" onclick="generateProjectionView()" style="width: 100%;">Generate Projection</button>
+                    </div>
+                </div>
             </div>
             
             <div class="chart-container"><canvas id="cpuChart"></canvas></div>
@@ -1115,7 +1135,167 @@
         machineVisualizationMode = mode;
         document.getElementById('tabBtnMachineStacked').classList.toggle('active', mode === 'stacked');
         document.getElementById('tabBtnMachineComparison').classList.toggle('active', mode === 'comparison');
-        updateMachineChart();
+        document.getElementById('tabBtnMachineProjection').classList.toggle('active', mode === 'projection');
+        
+        // Show/hide projection controls
+        const projectionControls = document.getElementById('projectionControls');
+        if (mode === 'projection') {
+            projectionControls.classList.remove('hidden');
+            // Don't update chart until user clicks Generate button
+            if (chart) {
+                chart.destroy();
+                chart = null;
+            }
+        } else {
+            projectionControls.classList.add('hidden');
+            updateMachineChart();
+        }
+    }
+    
+    function validateNumericInput(value) {
+        // Allow numeric values with optional decimal point
+        const numericRegex = /^-?\d*\.?\d+$/;
+        return numericRegex.test(value.trim());
+    }
+    
+    function generateProjectionView() {
+        const currentRPerfInput = document.getElementById('currentRPerf');
+        const targetRPerfInput = document.getElementById('targetRPerf');
+        const currentRPerfError = document.getElementById('currentRPerfError');
+        const targetRPerfError = document.getElementById('targetRPerfError');
+        
+        const currentRPerfValue = currentRPerfInput.value.trim();
+        const targetRPerfValue = targetRPerfInput.value.trim();
+        
+        // Reset error messages
+        currentRPerfError.style.display = 'none';
+        targetRPerfError.style.display = 'none';
+        currentRPerfInput.style.borderBottomColor = 'var(--cds-border-subtle)';
+        targetRPerfInput.style.borderBottomColor = 'var(--cds-border-subtle)';
+        
+        let hasError = false;
+        
+        // Validate current rPerf
+        if (!currentRPerfValue || !validateNumericInput(currentRPerfValue)) {
+            currentRPerfError.style.display = 'block';
+            currentRPerfInput.style.borderBottomColor = 'var(--cds-support-error)';
+            hasError = true;
+        }
+        
+        // Validate target rPerf
+        if (!targetRPerfValue || !validateNumericInput(targetRPerfValue)) {
+            targetRPerfError.style.display = 'block';
+            targetRPerfInput.style.borderBottomColor = 'var(--cds-support-error)';
+            hasError = true;
+        }
+        
+        if (hasError) {
+            return;
+        }
+        
+        const currentRPerf = parseFloat(currentRPerfValue);
+        const targetRPerf = parseFloat(targetRPerfValue);
+        
+        // Check for division by zero
+        if (targetRPerf === 0) {
+            targetRPerfError.textContent = 'Target rPerf cannot be zero';
+            targetRPerfError.style.display = 'block';
+            targetRPerfInput.style.borderBottomColor = 'var(--cds-support-error)';
+            return;
+        }
+        
+        // Generate the projection chart
+        updateProjectionChart(currentRPerf, targetRPerf);
+    }
+    
+    function updateProjectionChart(currentRPerf, targetRPerf) {
+        const m = document.getElementById('machineSelect').value;
+        const met = document.getElementById('metricSelect').value;
+        const pools = Array.from(document.querySelectorAll('#poolCheckboxes input:checked')).map(i => i.value);
+        const dates = getFilteredDates();
+        
+        if (!config[m] || dates.length === 0 || pools.length === 0) {
+            return;
+        }
+        
+        const isCapacityMode = aggregationMode === 'capacity';
+        const isCapacityLparMaxMode = aggregationMode === 'capacityLparMax';
+        const isCapacityDifferentDayMode = aggregationMode === 'capacityDifferentDay';
+        const isCapacityLparDifferentDayMode = aggregationMode === 'capacityLparDifferentDay';
+        
+        // Calculate the projection multiplier
+        const projectionMultiplier = currentRPerf / targetRPerf;
+        
+        // Calculate selected metric daily values
+        let metricDaily;
+        if (isCapacityMode || isCapacityDifferentDayMode || isCapacityLparMaxMode || isCapacityLparDifferentDayMode) {
+            metricDaily = dates.map(d => {
+                if (isCapacityLparMaxMode || isCapacityLparDifferentDayMode) {
+                    return pools.reduce((sum, p) => sum + config[m][p].reduce((lparSum, l) => {
+                        return lparSum + getLparMetricForDate(l, d);
+                    }, 0), 0);
+                }
+                return pools.reduce((sum, p) => {
+                    return sum + config[m][p].reduce((lparSum, l) => {
+                        return lparSum + getLparStats(l, d)[met];
+                    }, 0);
+                }, 0);
+            });
+        } else {
+            metricDaily = dates.map(d => {
+                const combined = Array(intervalsPerDay).fill(0);
+                pools.forEach(p => {
+                    config[m][p].forEach(l => {
+                        const intervals = getLparStats(l, d).intervals;
+                        intervals.forEach((v, i) => combined[i] += v);
+                    });
+                });
+                if (met === "Max") return Math.max(...combined);
+                else if (met === "Avg") return combined.reduce((a, b) => a + b, 0) / intervalsPerDay;
+                else if (met.startsWith('p')) return calculatePercentile(combined, parseInt(met.substring(1)) / 100);
+                return 0;
+            });
+        }
+        
+        // Apply projection multiplier to metric values
+        const projectedMetricDaily = metricDaily.map(value => value * projectionMultiplier);
+        
+        const aggregationModeLabel = isCapacityMode
+            ? 'Capacity planning (sum of metrics)'
+            : isCapacityLparMaxMode
+            ? 'Capacity planning (sum of LPAR daily metric)'
+            : isCapacityDifferentDayMode
+            ? 'Capacity Planning (sum of metrics from different day)'
+            : isCapacityLparDifferentDayMode
+            ? 'Capacity planning (sum of LPAR different days)'
+            : 'Actual usage (metric of sums)';
+        
+        const projectionDatasets = [
+            {
+                label: `${met.toUpperCase()} ${aggregationModeLabel}`,
+                data: metricDaily,
+                borderColor: '#0f62fe',
+                backgroundColor: 'rgba(15, 98, 254, 0.1)',
+                fill: false,
+                borderWidth: 2,
+                pointRadius: 3,
+                pointHoverRadius: 5,
+                tension: 0.1
+            },
+            {
+                label: `${met.toUpperCase()} ${aggregationModeLabel} (Projected)`,
+                data: projectedMetricDaily,
+                borderColor: '#da1e28',
+                backgroundColor: 'rgba(218, 30, 40, 0.1)',
+                fill: false,
+                borderWidth: 2,
+                pointRadius: 3,
+                pointHoverRadius: 5,
+                tension: 0.1
+            }
+        ];
+        
+        initChart(dates, projectionDatasets, false, false);
     }
 
     function populatePoolCheckboxes() {
@@ -1224,6 +1404,15 @@
     }
 
     function updateMachineChart() {
+        // If in projection view mode, clear the chart and return
+        if (machineVisualizationMode === 'projection') {
+            if (chart) {
+                chart.destroy();
+                chart = null;
+            }
+            return;
+        }
+        
         const m = document.getElementById('machineSelect').value, met = document.getElementById('metricSelect').value;
         const pools = Array.from(document.querySelectorAll('#poolCheckboxes input:checked')).map(i => i.value);
         const dates = getFilteredDates();
@@ -1931,7 +2120,7 @@
         }
         
         // Determine chart type and stacking based on mode
-        const isLineChart = currentTab === 'lpar' || (currentTab === 'machine' && machineVisualizationMode === 'comparison');
+        const isLineChart = currentTab === 'lpar' || (currentTab === 'machine' && (machineVisualizationMode === 'comparison' || machineVisualizationMode === 'projection'));
         const shouldStack = (currentTab === 'machine' && machineVisualizationMode === 'stacked') || currentTab === 'lpar';
         
         chart = new Chart(document.getElementById('cpuChart').getContext('2d'), {
