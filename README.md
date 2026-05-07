@@ -21,6 +21,8 @@
     - [Machine CPU Utilization (Sum by Pool)](#machine-cpu-utilization-sum-by-pool)
       - [Overall](#overall)
       - [Graph](#graph)
+    - [Comparison](#comparison)
+    - [Projection](#projection)
     - [LPAR CPU Utilization (by Date)](#lpar-cpu-utilization-by-date)
     - [Capacity Planning with Percentile](#capacity-planning-with-percentile)
     - [Dark Mode](#dark-mode)
@@ -29,16 +31,23 @@
     - [`config.ini`](#configini)
     - [CSV Performance Data](#csv-performance-data)
     - [Supported Date Formats](#supported-date-formats)
+  - [Capacity Planning Analysis Script](#capacity-planning-analysis-script)
+    - [analyze\_exceedance.py](#analyze_exceedancepy)
   - [Example Data Generation (Python)](#example-data-generation-python)
   - [Architecture](#architecture)
   - [Technologies Used](#technologies-used)
   - [Percentile Calculation Methods](#percentile-calculation-methods)
     - [Overview](#overview)
+    - [How interpolation works](#how-interpolation-works)
     - [PERCENTILE.INC (Inclusive Method)](#percentileinc-inclusive-method)
     - [PERCENTILE.EXC (Exclusive Method)](#percentileexc-exclusive-method)
+    - [Key difference between INC and EXC](#key-difference-between-inc-and-exc)
     - [Comparison Table](#comparison-table)
     - [Which Method to Choose?](#which-method-to-choose)
     - [Practical Example with CPU Data](#practical-example-with-cpu-data)
+      - [Using `INC`](#using-inc)
+      - [Using `EXC`](#using-exc)
+    - [Practical interpretation for CPU utilization](#practical-interpretation-for-cpu-utilization)
 
 
 ## Description
@@ -283,6 +292,14 @@ Recent interface updates in [visualizer.html](visualizer.html) include:
 #### Graph
 
 ![](images/machine-utilization-02.png)
+
+### Comparison
+
+![](images/machine-utilization-03.png)
+
+### Projection
+
+![](images/machine-utilization-04.png)
 
 ### LPAR CPU Utilization (by Date)
 
