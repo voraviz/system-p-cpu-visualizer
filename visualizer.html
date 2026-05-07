@@ -618,7 +618,10 @@
                 </div>
             </div>
             <div class="controls">
-                <div class="field-group control-item"><label for="machineSelect">Select machine</label><select id="machineSelect" onchange="selectedPools.clear(); populatePoolCheckboxes()"></select></div>
+                <div class="field-group" style="grid-column: span 12;">
+                    <label>Select machines</label>
+                    <div id="machineCheckboxes" class="checkbox-group"></div>
+                </div>
                 <div class="field-group control-item"><label for="metricSelect">Metric selection</label><select id="metricSelect" onchange="updateMachineChart()">
                     <option value="Max">Max</option><option value="p95">P95</option><option value="p90">P90</option>
                     <option value="p80">P80</option><option value="p70">P70</option><option value="p60">P60</option>
@@ -631,7 +634,6 @@
                     <option value="capacityDifferentDay">Capacity Planning (sum of metrics from different day)</option>
                     <option value="capacityLparDifferentDay">Capacity planning (sum of LPAR different days)</option>
                 </select></div>
-                <div class="field-group control-item"></div>
                 <div class="field-group control-item"><label for="startDateSelect">Start date</label><input type="date" id="startDateSelect" onchange="updateMachineChart()" title="Select start date for data range (leave empty for all dates)"></div>
                 <div class="field-group control-item"><label for="endDateSelect">End date</label><input type="date" id="endDateSelect" onchange="updateMachineChart()" title="Select end date for data range (leave empty for all dates)"></div>
                 <div class="field-group" style="grid-column: span 12;">
@@ -854,7 +856,7 @@
 </div>
 
 <script>
-    let config = {}, lparData = {}, percentileMethod = 'INC', standbyValue = 0.1, intervalMinutes = 5, intervalsPerDay = 288, annualizationDays = 365, dateFormat = 'MM/DD/YYYY', allDates = new Set(), currentTab = 'machine', chart = null, selectedLpars = new Set(), selectedPools = new Set(), selectedCapacityPlanningPools = new Set(), selectedCapacityPlanningMachines = new Set(), aggregationMode = 'actual', startDateFilter = null, endDateFilter = null, machineVisualizationMode = 'stacked';
+    let config = {}, lparData = {}, percentileMethod = 'INC', standbyValue = 0.1, intervalMinutes = 5, intervalsPerDay = 288, annualizationDays = 365, dateFormat = 'MM/DD/YYYY', allDates = new Set(), currentTab = 'machine', chart = null, selectedLpars = new Set(), selectedPools = new Set(), selectedCapacityPlanningPools = new Set(), selectedCapacityPlanningMachines = new Set(), selectedMachines = new Set(), aggregationMode = 'actual', startDateFilter = null, endDateFilter = null, machineVisualizationMode = 'stacked';
 
     function setTheme(theme) {
         const isDark = theme === 'dark';
@@ -1030,10 +1032,12 @@
 
     function updateSelectors() {
         const sortedDates = Array.from(allDates).sort((a, b) => new Date(a) - new Date(b));
-        const m1 = document.getElementById('machineSelect'), m2 = document.getElementById('lparMachineSelect');
+        const m2 = document.getElementById('lparMachineSelect');
         const machineOptions = Object.keys(config).map(m => `<option value="${m}">${m}</option>`).join('');
-        m1.innerHTML = machineOptions;
         m2.innerHTML = machineOptions;
+        
+        // Populate machine checkboxes for Machine Utilization tab
+        populateMachineCheckboxes();
         
         // Set min/max for date pickers and default values based on available data
         if (sortedDates.length > 0) {
@@ -1064,7 +1068,10 @@
 
         }
         
-        if (currentTab === 'machine') populatePoolCheckboxes();
+        if (currentTab === 'machine') {
+            populateMachineCheckboxes();
+            populatePoolCheckboxes();
+        }
         else if (currentTab === 'lpar') populateLparList();
         else populateCapacityPlanningMachineCheckboxes();
     }
@@ -1126,7 +1133,10 @@
             machineVisualizationTabs.classList.toggle('hidden', tab !== 'machine');
         }
         
-        if (tab === 'machine') populatePoolCheckboxes();
+        if (tab === 'machine') {
+            populateMachineCheckboxes();
+            populatePoolCheckboxes();
+        }
         else if (tab === 'lpar') populateLparList();
         else populateCapacityPlanningMachineCheckboxes();
     }
@@ -1170,6 +1180,8 @@
         // Reset error messages
         currentRPerfError.style.display = 'none';
         targetRPerfError.style.display = 'none';
+        currentRPerfError.textContent = 'Please enter a valid numeric value';
+        targetRPerfError.textContent = 'Please enter a valid numeric value';
         currentRPerfInput.style.borderBottomColor = 'var(--cds-border-subtle)';
         targetRPerfInput.style.borderBottomColor = 'var(--cds-border-subtle)';
         
@@ -1209,14 +1221,21 @@
     }
     
     function updateProjectionChart(currentRPerf, targetRPerf) {
-        const m = document.getElementById('machineSelect').value;
         const met = document.getElementById('metricSelect').value;
         const pools = Array.from(document.querySelectorAll('#poolCheckboxes input:checked')).map(i => i.value);
         const dates = getFilteredDates();
         
-        if (!config[m] || dates.length === 0 || pools.length === 0) {
+        if (dates.length === 0 || pools.length === 0) {
             return;
         }
+        
+        // Parse pools by machine
+        const machinePoolsMap = {};
+        pools.forEach(poolKey => {
+            const [machine, pool] = poolKey.split(':');
+            if (!machinePoolsMap[machine]) machinePoolsMap[machine] = [];
+            machinePoolsMap[machine].push(pool);
+        });
         
         const isCapacityMode = aggregationMode === 'capacity';
         const isCapacityLparMaxMode = aggregationMode === 'capacityLparMax';
@@ -1226,28 +1245,51 @@
         // Calculate the projection multiplier
         const projectionMultiplier = currentRPerf / targetRPerf;
         
+        // Helper function to get LPAR metric for a specific date
+        const getLparMetricForDate = (lpar, date) => {
+            const stats = getLparStats(lpar, date);
+            if (isCapacityLparMaxMode || isCapacityLparDifferentDayMode) {
+                if (met === "Max") return stats.intervals.length ? Math.max(...stats.intervals) : 0;
+                if (met === "Avg") return stats.intervals.length ? stats.intervals.reduce((a, b) => a + b, 0) / intervalsPerDay : 0;
+                if (met.startsWith('p')) return stats.intervals.length ? calculatePercentile(stats.intervals, parseInt(met.substring(1)) / 100) : 0;
+                return 0;
+            }
+            return stats[met];
+        };
+        
         // Calculate selected metric daily values
         let metricDaily;
         if (isCapacityMode || isCapacityDifferentDayMode || isCapacityLparMaxMode || isCapacityLparDifferentDayMode) {
             metricDaily = dates.map(d => {
-                if (isCapacityLparMaxMode || isCapacityLparDifferentDayMode) {
-                    return pools.reduce((sum, p) => sum + config[m][p].reduce((lparSum, l) => {
-                        return lparSum + getLparMetricForDate(l, d);
-                    }, 0), 0);
-                }
-                return pools.reduce((sum, p) => {
-                    return sum + config[m][p].reduce((lparSum, l) => {
-                        return lparSum + getLparStats(l, d)[met];
-                    }, 0);
-                }, 0);
+                let total = 0;
+                Object.keys(machinePoolsMap).forEach(machine => {
+                    machinePoolsMap[machine].forEach(pool => {
+                        if (config[machine] && config[machine][pool]) {
+                            if (isCapacityLparMaxMode || isCapacityLparDifferentDayMode) {
+                                total += config[machine][pool].reduce((lparSum, l) => {
+                                    return lparSum + getLparMetricForDate(l, d);
+                                }, 0);
+                            } else {
+                                total += config[machine][pool].reduce((lparSum, l) => {
+                                    return lparSum + getLparStats(l, d)[met];
+                                }, 0);
+                            }
+                        }
+                    });
+                });
+                return total;
             });
         } else {
             metricDaily = dates.map(d => {
                 const combined = Array(intervalsPerDay).fill(0);
-                pools.forEach(p => {
-                    config[m][p].forEach(l => {
-                        const intervals = getLparStats(l, d).intervals;
-                        intervals.forEach((v, i) => combined[i] += v);
+                Object.keys(machinePoolsMap).forEach(machine => {
+                    machinePoolsMap[machine].forEach(pool => {
+                        if (config[machine] && config[machine][pool]) {
+                            config[machine][pool].forEach(l => {
+                                const intervals = getLparStats(l, d).intervals;
+                                intervals.forEach((v, i) => combined[i] += v);
+                            });
+                        }
                     });
                 });
                 if (met === "Max") return Math.max(...combined);
@@ -1298,15 +1340,65 @@
         initChart(dates, projectionDatasets, false, false);
     }
 
+    function populateMachineCheckboxes() {
+        const container = document.getElementById('machineCheckboxes');
+        const machines = Object.keys(config);
+        
+        // If no machines selected yet, select all by default
+        if (selectedMachines.size === 0) {
+            machines.forEach(m => selectedMachines.add(m));
+        }
+        
+        container.innerHTML = machines.map(m => `<div class="checkbox-item"><input type="checkbox" ${selectedMachines.has(m) ? 'checked' : ''} value="${m}" onchange="updateMachineSelection(this)"> <span>${m}</span></div>`).join('');
+    }
+
+    function updateMachineSelection(checkbox) {
+        if (checkbox.checked) {
+            selectedMachines.add(checkbox.value);
+        } else {
+            selectedMachines.delete(checkbox.value);
+            // Remove pools from the deselected machine
+            const poolsToRemove = [];
+            selectedPools.forEach(poolKey => {
+                const [machine, pool] = poolKey.split(':');
+                if (machine === checkbox.value) {
+                    poolsToRemove.push(poolKey);
+                }
+            });
+            poolsToRemove.forEach(poolKey => selectedPools.delete(poolKey));
+        }
+        // Update pools display
+        populatePoolCheckboxes();
+    }
+
     function populatePoolCheckboxes() {
-        const m = document.getElementById('machineSelect').value, container = document.getElementById('poolCheckboxes');
-        if (!config[m]) return;
-        const pools = Object.keys(config[m]);
+        const container = document.getElementById('poolCheckboxes');
+        const machines = Array.from(selectedMachines);
+        
+        if (machines.length === 0) {
+            container.innerHTML = '';
+            return;
+        }
+        
+        // Collect all pools from selected machines
+        const allPools = [];
+        machines.forEach(machine => {
+            if (config[machine]) {
+                Object.keys(config[machine]).forEach(pool => {
+                    allPools.push({ machine, pool, label: `${machine} - ${pool}` });
+                });
+            }
+        });
+        
         // If no pools selected yet, select all by default
         if (selectedPools.size === 0) {
-            pools.forEach(p => selectedPools.add(p));
+            allPools.forEach(p => selectedPools.add(`${p.machine}:${p.pool}`));
         }
-        container.innerHTML = pools.map(p => `<div class="checkbox-item"><input type="checkbox" ${selectedPools.has(p) ? 'checked' : ''} value="${p}" onchange="updatePoolSelection(this); updateMachineChart()"> <span>${p}</span></div>`).join('');
+        
+        container.innerHTML = allPools.map(p => {
+            const key = `${p.machine}:${p.pool}`;
+            return `<div class="checkbox-item"><input type="checkbox" ${selectedPools.has(key) ? 'checked' : ''} value="${key}" onchange="updatePoolSelection(this); updateMachineChart()"> <span>${p.label}</span></div>`;
+        }).join('');
         updateMachineChart();
     }
 
@@ -1413,7 +1505,7 @@
             return;
         }
         
-        const m = document.getElementById('machineSelect').value, met = document.getElementById('metricSelect').value;
+        const met = document.getElementById('metricSelect').value;
         const pools = Array.from(document.querySelectorAll('#poolCheckboxes input:checked')).map(i => i.value);
         const dates = getFilteredDates();
         const poolContainer = document.getElementById('poolBreakdown'); poolContainer.innerHTML = "";
@@ -1427,7 +1519,15 @@
         document.getElementById('exceedResults').classList.add('hidden');
         document.querySelector('.chart-band').classList.toggle('hidden', currentTab === 'machine' && (isCapacityDifferentDayMode || isCapacityLparDifferentDayMode));
         
-        if (!config[m] || dates.length === 0 || pools.length === 0) return;
+        if (dates.length === 0 || pools.length === 0) return;
+        
+        // Parse pools by machine
+        const machinePoolsMap = {};
+        pools.forEach(poolKey => {
+            const [machine, pool] = poolKey.split(':');
+            if (!machinePoolsMap[machine]) machinePoolsMap[machine] = [];
+            machinePoolsMap[machine].push(pool);
+        });
 
         const formatIntervalTime = (index) => {
             const intervalsPerHour = 60 / intervalMinutes;
@@ -1436,12 +1536,14 @@
             return `${hour}:${minute.toString().padStart(2, '0')}`;
         };
 
-        const getPoolActualDailyValues = (pool) => dates.map(d => {
+        const getPoolActualDailyValues = (machine, pool) => dates.map(d => {
             const combined = Array(intervalsPerDay).fill(0);
-            config[m][pool].forEach(l => {
-                const intervals = getLparStats(l, d).intervals;
-                intervals.forEach((v, i) => combined[i] += v);
-            });
+            if (config[machine] && config[machine][pool]) {
+                config[machine][pool].forEach(l => {
+                    const intervals = getLparStats(l, d).intervals;
+                    intervals.forEach((v, i) => combined[i] += v);
+                });
+            }
             if (met === "Max") return Math.max(...combined);
             else if (met === "Avg") return combined.reduce((a, b) => a + b, 0) / intervalsPerDay;
             else if (met.startsWith('p')) return calculatePercentile(combined, parseInt(met.substring(1)) / 100);
@@ -1459,12 +1561,18 @@
             return stats[met];
         };
 
-        const poolDatasets = pools.map((p, idx) => {
+        const poolDatasets = pools.map((poolKey, idx) => {
+            const [machine, pool] = poolKey.split(':');
             let daily;
             if (isCapacityMode || isCapacityDifferentDayMode || isCapacityLparMaxMode || isCapacityLparDifferentDayMode) {
-                daily = dates.map(d => config[m][p].reduce((s, l) => s + getLparMetricForDate(l, d), 0));
+                daily = dates.map(d => {
+                    if (config[machine] && config[machine][pool]) {
+                        return config[machine][pool].reduce((s, l) => s + getLparMetricForDate(l, d), 0);
+                    }
+                    return 0;
+                });
             } else {
-                daily = getPoolActualDailyValues(p);
+                daily = getPoolActualDailyValues(machine, pool);
             }
 
             const minV = Math.min(...daily), maxV = Math.max(...daily);
@@ -1475,10 +1583,12 @@
             if (aggregationMode === 'actual') {
                 const getPoolCombinedIntervalsForDate = (date) => {
                     const combined = Array(intervalsPerDay).fill(0);
-                    config[m][p].forEach(l => {
-                        const intervals = getLparStats(l, date).intervals;
-                        intervals.forEach((v, i) => combined[i] += v);
-                    });
+                    if (config[machine] && config[machine][pool]) {
+                        config[machine][pool].forEach(l => {
+                            const intervals = getLparStats(l, date).intervals;
+                            intervals.forEach((v, i) => combined[i] += v);
+                        });
+                    }
                     return combined;
                 };
                 const minIntervals = getPoolCombinedIntervalsForDate(minD);
@@ -1488,11 +1598,11 @@
             }
 
             const card = document.createElement('div'); card.className = 'pool-card';
-            card.innerHTML = `<h4>Pool: ${p}</h4><div class="pool-stat-grid">
+            card.innerHTML = `<h4>Pool: ${machine} - ${pool}</h4><div class="pool-stat-grid">
                 <div><div class="pool-sub-label">Min</div><div class="pool-sub-val">${minV.toFixed(2)}</div><div class="pool-sub-date">${minDisplayDate}</div></div>
                 <div><div class="pool-sub-label">Max</div><div class="pool-sub-val">${maxV.toFixed(2)}</div><div class="pool-sub-date">${maxDisplayDate}</div></div></div>`;
             poolContainer.appendChild(card);
-            return { label: p, backgroundColor: getMachineChartColor(idx), data: daily };
+            return { label: `${machine} - ${pool}`, backgroundColor: getMachineChartColor(idx), data: daily };
         });
 
         const poolBreakdownTitle = document.getElementById('poolBreakdownTitle');
@@ -1504,22 +1614,25 @@
             if (poolBreakdownTitle) {
                 poolBreakdownTitle.innerText = 'Individual LPAR performance';
             }
-            pools.forEach(pool => {
-                config[m][pool].forEach(lpar => {
-                    const daily = dates.map(d => getLparMetricForDate(lpar, d));
-                    const minV = Math.min(...daily), maxV = Math.max(...daily);
-                    const minD = dates[daily.indexOf(minV)], maxD = dates[daily.indexOf(maxV)];
-                    const card = document.createElement('div'); card.className = 'pool-card';
-                    card.innerHTML = `<h4>LPAR: ${lpar}</h4><div class="pool-stat-grid">
-                        <div><div class="pool-sub-label">Pool</div><div class="pool-sub-val" style="font-size: 1rem;">${pool}</div><div class="pool-sub-date">${minD}</div></div>
-                        <div><div class="pool-sub-label">Max</div><div class="pool-sub-val">${maxV.toFixed(2)}</div><div class="pool-sub-date">${maxD}</div></div></div>`;
-                    poolContainer.appendChild(card);
-                    lparDatasets.push({
-                        label: `${pool} / ${lpar}`,
-                        backgroundColor: getMachineChartColor(lparIndex++),
-                        data: daily
+            pools.forEach(poolKey => {
+                const [machine, pool] = poolKey.split(':');
+                if (config[machine] && config[machine][pool]) {
+                    config[machine][pool].forEach(lpar => {
+                        const daily = dates.map(d => getLparMetricForDate(lpar, d));
+                        const minV = Math.min(...daily), maxV = Math.max(...daily);
+                        const minD = dates[daily.indexOf(minV)], maxD = dates[daily.indexOf(maxV)];
+                        const card = document.createElement('div'); card.className = 'pool-card';
+                        card.innerHTML = `<h4>LPAR: ${lpar}</h4><div class="pool-stat-grid">
+                            <div><div class="pool-sub-label">Pool</div><div class="pool-sub-val" style="font-size: 1rem;">${machine} - ${pool}</div><div class="pool-sub-date">${minD}</div></div>
+                            <div><div class="pool-sub-label">Max</div><div class="pool-sub-val">${maxV.toFixed(2)}</div><div class="pool-sub-date">${maxD}</div></div></div>`;
+                        poolContainer.appendChild(card);
+                        lparDatasets.push({
+                            label: `${machine} - ${pool} / ${lpar}`,
+                            backgroundColor: getMachineChartColor(lparIndex++),
+                            data: daily
+                        });
                     });
-                });
+                }
             });
             stackedDatasets = lparDatasets;
         } else if (poolBreakdownTitle) {
@@ -1536,11 +1649,14 @@
         } else {
             machineDaily = dates.map(d => {
                 const combined = Array(intervalsPerDay).fill(0);
-                pools.forEach(p => {
-                    config[m][p].forEach(l => {
-                        const intervals = getLparStats(l, d).intervals;
-                        intervals.forEach((v, i) => combined[i] += v);
-                    });
+                pools.forEach(poolKey => {
+                    const [machine, pool] = poolKey.split(':');
+                    if (config[machine] && config[machine][pool]) {
+                        config[machine][pool].forEach(l => {
+                            const intervals = getLparStats(l, d).intervals;
+                            intervals.forEach((v, i) => combined[i] += v);
+                        });
+                    }
                 });
                 if (met === "Max") return Math.max(...combined);
                 else if (met === "Avg") return combined.reduce((a, b) => a + b, 0) / intervalsPerDay;
@@ -1595,11 +1711,14 @@
             const machineMaxDate = dates[machineDaily.indexOf(mMax)];
             const getCombinedIntervalsForDate = (date) => {
                 const combined = Array(intervalsPerDay).fill(0);
-                pools.forEach(p => {
-                    config[m][p].forEach(l => {
-                        const intervals = getLparStats(l, date).intervals;
-                        intervals.forEach((v, i) => combined[i] += v);
-                    });
+                pools.forEach(poolKey => {
+                    const [machine, pool] = poolKey.split(':');
+                    if (config[machine] && config[machine][pool]) {
+                        config[machine][pool].forEach(l => {
+                            const intervals = getLparStats(l, date).intervals;
+                            intervals.forEach((v, i) => combined[i] += v);
+                        });
+                    }
                 });
                 return combined;
             };
@@ -1627,11 +1746,14 @@
         if (machineVisualizationMode === 'comparison') {
             const actualDaily = dates.map(d => {
                 const combined = Array(intervalsPerDay).fill(0);
-                pools.forEach(p => {
-                    config[m][p].forEach(l => {
-                        const intervals = getLparStats(l, d).intervals;
-                        intervals.forEach((v, i) => combined[i] += v);
-                    });
+                pools.forEach(poolKey => {
+                    const [machine, pool] = poolKey.split(':');
+                    if (config[machine] && config[machine][pool]) {
+                        config[machine][pool].forEach(l => {
+                            const intervals = getLparStats(l, d).intervals;
+                            intervals.forEach((v, i) => combined[i] += v);
+                        });
+                    }
                 });
                 return Math.max(...combined);
             });
@@ -1639,25 +1761,34 @@
             let metricDaily;
             if (isCapacityMode || isCapacityDifferentDayMode || isCapacityLparMaxMode || isCapacityLparDifferentDayMode) {
                 metricDaily = dates.map(d => {
-                    if (isCapacityLparMaxMode || isCapacityLparDifferentDayMode) {
-                        return pools.reduce((sum, p) => sum + config[m][p].reduce((lparSum, l) => {
-                            return lparSum + getLparMetricForDate(l, d);
-                        }, 0), 0);
-                    }
-                    return pools.reduce((sum, p) => {
-                        return sum + config[m][p].reduce((lparSum, l) => {
-                            return lparSum + getLparStats(l, d)[met];
-                        }, 0);
-                    }, 0);
+                    let total = 0;
+                    pools.forEach(poolKey => {
+                        const [machine, pool] = poolKey.split(':');
+                        if (config[machine] && config[machine][pool]) {
+                            if (isCapacityLparMaxMode || isCapacityLparDifferentDayMode) {
+                                total += config[machine][pool].reduce((lparSum, l) => {
+                                    return lparSum + getLparMetricForDate(l, d);
+                                }, 0);
+                            } else {
+                                total += config[machine][pool].reduce((lparSum, l) => {
+                                    return lparSum + getLparStats(l, d)[met];
+                                }, 0);
+                            }
+                        }
+                    });
+                    return total;
                 });
             } else {
                 metricDaily = dates.map(d => {
                     const combined = Array(intervalsPerDay).fill(0);
-                    pools.forEach(p => {
-                        config[m][p].forEach(l => {
-                            const intervals = getLparStats(l, d).intervals;
-                            intervals.forEach((v, i) => combined[i] += v);
-                        });
+                    pools.forEach(poolKey => {
+                        const [machine, pool] = poolKey.split(':');
+                        if (config[machine] && config[machine][pool]) {
+                            config[machine][pool].forEach(l => {
+                                const intervals = getLparStats(l, d).intervals;
+                                intervals.forEach((v, i) => combined[i] += v);
+                            });
+                        }
                     });
                     if (met === "Max") return Math.max(...combined);
                     else if (met === "Avg") return combined.reduce((a, b) => a + b, 0) / intervalsPerDay;
@@ -2159,14 +2290,21 @@
     }
 
     function calculatePercentileExceedStats() {
-        const m = document.getElementById('machineSelect').value;
         const met = document.getElementById('metricSelect').value;
         const pools = Array.from(document.querySelectorAll('#poolCheckboxes input:checked')).map(i => i.value);
         const dates = getFilteredDates();
         
-        if (!config[m] || dates.length === 0 || pools.length === 0 || !met.startsWith('p') || (aggregationMode !== 'capacity' && aggregationMode !== 'capacityDifferentDay' && aggregationMode !== 'capacityLparMax' && aggregationMode !== 'capacityLparDifferentDay')) {
+        if (dates.length === 0 || pools.length === 0 || !met.startsWith('p') || (aggregationMode !== 'capacity' && aggregationMode !== 'capacityDifferentDay' && aggregationMode !== 'capacityLparMax' && aggregationMode !== 'capacityLparDifferentDay')) {
             return;
         }
+        
+        // Parse pools by machine
+        const machinePoolsMap = {};
+        pools.forEach(poolKey => {
+            const [machine, pool] = poolKey.split(':');
+            if (!machinePoolsMap[machine]) machinePoolsMap[machine] = [];
+            machinePoolsMap[machine].push(pool);
+        });
         
         const percentileValue = parseInt(met.substring(1)) / 100;
         let maxCapacityPlanning = 0;
@@ -2174,34 +2312,50 @@
         
         if (aggregationMode === 'capacity') {
             const capacityPlanningValues = dates.map(d => {
-                return pools.reduce((sum, p) => {
-                    return sum + config[m][p].reduce((lparSum, l) => {
-                        const stats = getLparStats(l, d);
-                        const percentile = calculatePercentile(stats.intervals, percentileValue);
-                        return lparSum + percentile;
-                    }, 0);
-                }, 0);
+                let total = 0;
+                Object.keys(machinePoolsMap).forEach(machine => {
+                    machinePoolsMap[machine].forEach(pool => {
+                        if (config[machine] && config[machine][pool]) {
+                            total += config[machine][pool].reduce((lparSum, l) => {
+                                const stats = getLparStats(l, d);
+                                const percentile = calculatePercentile(stats.intervals, percentileValue);
+                                return lparSum + percentile;
+                            }, 0);
+                        }
+                    });
+                });
+                return total;
             });
             maxCapacityPlanning = Math.max(...capacityPlanningValues);
             maxCapacityDate = dates[capacityPlanningValues.indexOf(maxCapacityPlanning)];
         } else if (aggregationMode === 'capacityLparMax') {
             const capacityPlanningValues = dates.map(d => {
-                return pools.reduce((sum, p) => {
-                    return sum + config[m][p].reduce((lparSum, l) => {
-                        const stats = getLparStats(l, d);
-                        const metricValue = calculatePercentile(stats.intervals, percentileValue);
-                        return lparSum + metricValue;
-                    }, 0);
-                }, 0);
+                let total = 0;
+                Object.keys(machinePoolsMap).forEach(machine => {
+                    machinePoolsMap[machine].forEach(pool => {
+                        if (config[machine] && config[machine][pool]) {
+                            total += config[machine][pool].reduce((lparSum, l) => {
+                                const stats = getLparStats(l, d);
+                                const metricValue = calculatePercentile(stats.intervals, percentileValue);
+                                return lparSum + metricValue;
+                            }, 0);
+                        }
+                    });
+                });
+                return total;
             });
             maxCapacityPlanning = Math.max(...capacityPlanningValues);
             maxCapacityDate = dates[capacityPlanningValues.indexOf(maxCapacityPlanning)];
         } else if (aggregationMode === 'capacityLparDifferentDay') {
             // Sum each LPAR's maximum across all dates (different days per LPAR)
             const allLpars = [];
-            pools.forEach(p => {
-                config[m][p].forEach(l => {
-                    allLpars.push(l);
+            Object.keys(machinePoolsMap).forEach(machine => {
+                machinePoolsMap[machine].forEach(pool => {
+                    if (config[machine] && config[machine][pool]) {
+                        config[machine][pool].forEach(l => {
+                            allLpars.push(l);
+                        });
+                    }
                 });
             });
             
@@ -2215,17 +2369,22 @@
             }, 0);
             maxCapacityDate = 'Different days by LPAR';
         } else {
-            maxCapacityPlanning = pools.reduce((sum, p) => {
-                const poolDailyValues = dates.map(d => {
-                    return config[m][p].reduce((lparSum, l) => {
-                        const stats = getLparStats(l, d);
-                        const percentile = calculatePercentile(stats.intervals, percentileValue);
-                        return lparSum + percentile;
-                    }, 0);
+            maxCapacityPlanning = 0;
+            Object.keys(machinePoolsMap).forEach(machine => {
+                machinePoolsMap[machine].forEach(pool => {
+                    if (config[machine] && config[machine][pool]) {
+                        const poolDailyValues = dates.map(d => {
+                            return config[machine][pool].reduce((lparSum, l) => {
+                                const stats = getLparStats(l, d);
+                                const percentile = calculatePercentile(stats.intervals, percentileValue);
+                                return lparSum + percentile;
+                            }, 0);
+                        });
+                        const poolMax = poolDailyValues.length ? Math.max(...poolDailyValues) : 0;
+                        maxCapacityPlanning += poolMax;
+                    }
                 });
-                const poolMax = poolDailyValues.length ? Math.max(...poolDailyValues) : 0;
-                return sum + poolMax;
-            }, 0);
+            });
             maxCapacityDate = 'Different days by pool';
         }
         
@@ -2240,10 +2399,13 @@
             
             // Pre-fetch all LPAR intervals for this date to avoid repeated getLparStats calls
             const lparIntervals = [];
-            pools.forEach(p => {
-                config[m][p].forEach(l => {
-                    lparIntervals.push(getLparStats(l, date).intervals);
-                });
+            pools.forEach(poolKey => {
+                const [machine, pool] = poolKey.split(':');
+                if (config[machine] && config[machine][pool]) {
+                    config[machine][pool].forEach(l => {
+                        lparIntervals.push(getLparStats(l, date).intervals);
+                    });
+                }
             });
             
             // Check each interval
