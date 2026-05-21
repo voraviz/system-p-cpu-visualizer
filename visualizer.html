@@ -999,6 +999,16 @@
         return `${month.padStart(2, '0')}/${day.padStart(2, '0')}/${year}`;
     }
     
+    function formatDateForDisplay(dateStr) {
+        // Convert internal MM/DD/YYYY format to DD/MM/YYYY for display
+        const parts = dateStr.split('/');
+        if (parts.length === 3) {
+            const [month, day, year] = parts;
+            return `${day}/${month}/${year}`;
+        }
+        return dateStr;
+    }
+    
     function parseCSV(lpar, text) {
         const rows = text.split(/\r?\n/); lparData[lpar] = {};
         const expectedCols = intervalsPerDay + 1; // date + intervals
@@ -1337,7 +1347,7 @@
             }
         ];
         
-        initChart(dates, projectionDatasets, false, false);
+        initChart(dates.map(d => formatDateForDisplay(d)), projectionDatasets, false, false);
     }
 
     function populateMachineCheckboxes() {
@@ -1634,8 +1644,11 @@
                 };
                 const minIntervals = getPoolCombinedIntervalsForDate(minD);
                 const maxIntervals = getPoolCombinedIntervalsForDate(maxD);
-                minDisplayDate = `${minD} ${formatIntervalTime(minIntervals.indexOf(Math.min(...minIntervals)))}`;
-                maxDisplayDate = `${maxD} ${formatIntervalTime(maxIntervals.indexOf(Math.max(...maxIntervals)))}`;
+                minDisplayDate = `${formatDateForDisplay(minD)} ${formatIntervalTime(minIntervals.indexOf(Math.min(...minIntervals)))}`;
+                maxDisplayDate = `${formatDateForDisplay(maxD)} ${formatIntervalTime(maxIntervals.indexOf(Math.max(...maxIntervals)))}`;
+            } else {
+                minDisplayDate = formatDateForDisplay(minD);
+                maxDisplayDate = formatDateForDisplay(maxD);
             }
 
             const card = document.createElement('div'); card.className = 'pool-card';
@@ -1664,8 +1677,8 @@
                         const minD = dates[daily.indexOf(minV)], maxD = dates[daily.indexOf(maxV)];
                         const card = document.createElement('div'); card.className = 'pool-card';
                         card.innerHTML = `<h4>LPAR: ${lpar}</h4><div class="pool-stat-grid">
-                            <div><div class="pool-sub-label">Pool</div><div class="pool-sub-val" style="font-size: 1rem;">${machine} - ${pool}</div><div class="pool-sub-date">${minD}</div></div>
-                            <div><div class="pool-sub-label">Max</div><div class="pool-sub-val">${maxV.toFixed(2)}</div><div class="pool-sub-date">${maxD}</div></div></div>`;
+                            <div><div class="pool-sub-label">Pool</div><div class="pool-sub-val" style="font-size: 1rem;">${machine} - ${pool}</div><div class="pool-sub-date">${formatDateForDisplay(minD)}</div></div>
+                            <div><div class="pool-sub-label">Max</div><div class="pool-sub-val">${maxV.toFixed(2)}</div><div class="pool-sub-date">${formatDateForDisplay(maxD)}</div></div></div>`;
                         poolContainer.appendChild(card);
                         lparDatasets.push({
                             label: `${machine} - ${pool} / ${lpar}`,
@@ -1724,8 +1737,8 @@
                 if (machineDaily[i] < machineDaily[minDateIndex]) minDateIndex = i;
                 if (machineDaily[i] > machineDaily[maxDateIndex]) maxDateIndex = i;
             }
-            document.getElementById('statMinLabel').innerText = dates[minDateIndex] || '-';
-            document.getElementById('statMaxLabel').innerText = dates[maxDateIndex] || '-';
+            document.getElementById('statMinLabel').innerText = formatDateForDisplay(dates[minDateIndex]) || '-';
+            document.getElementById('statMaxLabel').innerText = formatDateForDisplay(dates[maxDateIndex]) || '-';
             if (poolPerformanceDescription) {
                 poolPerformanceDescription.innerText = 'LPAR maximum can come from different intervals within the same day.';
             }
@@ -1740,8 +1753,8 @@
                 if (machineDaily[i] < machineDaily[minDateIndex]) minDateIndex = i;
                 if (machineDaily[i] > machineDaily[maxDateIndex]) maxDateIndex = i;
             }
-            document.getElementById('statMinLabel').innerText = dates[minDateIndex] || '-';
-            document.getElementById('statMaxLabel').innerText = dates[maxDateIndex] || '-';
+            document.getElementById('statMinLabel').innerText = formatDateForDisplay(dates[minDateIndex]) || '-';
+            document.getElementById('statMaxLabel').innerText = formatDateForDisplay(dates[maxDateIndex]) || '-';
             if (poolPerformanceDescription) {
                 poolPerformanceDescription.innerText = 'Each day sums the maximum interval from every selected LPAR, independent of pool.';
             }
@@ -1802,8 +1815,8 @@
             const maxIntervals = getCombinedIntervalsForDate(machineMaxDate);
             const minTime = formatIntervalTime(minIntervals.indexOf(Math.min(...minIntervals)));
             const maxTime = formatIntervalTime(maxIntervals.indexOf(Math.max(...maxIntervals)));
-            document.getElementById('statMinDate').innerText = `${machineMinDate} ${minTime}`;
-            document.getElementById('statMaxDate').innerText = `${machineMaxDate} ${maxTime}`;
+            document.getElementById('statMinDate').innerText = `${formatDateForDisplay(machineMinDate)} ${minTime}`;
+            document.getElementById('statMaxDate').innerText = `${formatDateForDisplay(machineMaxDate)} ${maxTime}`;
             if (poolPerformanceDescription) {
                 poolPerformanceDescription.innerText = 'Simultaneous peak within the day.';
             }
@@ -1908,9 +1921,9 @@
                 }
             ];
             
-            initChart(dates, comparisonDatasets, false, false);
+            initChart(dates.map(d => formatDateForDisplay(d)), comparisonDatasets, false, false);
         } else {
-            initChart(dates, stackedDatasets);
+            initChart(dates.map(d => formatDateForDisplay(d)), stackedDatasets);
         }
     }
 
@@ -2297,7 +2310,7 @@
                         const index = context[0].dataIndex;
                         const date = window.lparIntervalDates[index];
                         const timeLabel = context[0].label;
-                        return `${date} ${timeLabel}`;
+                        return `${formatDateForDisplay(date)} ${timeLabel}`;
                     }
                     return context[0].label;
                 },
