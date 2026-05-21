@@ -260,6 +260,297 @@ INTERVAL=5
 - **Google Sheets Documentation:** [PERCENTILE function](https://support.google.com/docs/answer/3094114)
 - **Statistical Theory:** Hyndman, R.J. and Fan, Y. (1996). "Sample Quantiles in Statistical Packages", *The American Statistician*, 50(4), 361-365
 
+## Metric Max Calculation with Aggregation Methods
+
+This section explains how metric max (and other metrics) are calculated with different aggregation methods for dashboard and graph display.
+
+### Available Metrics
+
+The system supports multiple metrics for analysis:
+- **Max**: Maximum value across all intervals
+- **P95, P90, P80, P70, P60, P50**: Percentile values
+- **Avg**: Average value across all intervals
+
+### Detailed Aggregation Method Calculations
+
+#### 1. Actual Usage (Real Peak)
+
+Calculates the metric from combined intervals to show the actual simultaneous peak usage.
+
+**Algorithm:**
+```javascript
+// Step 1: Combine all LPAR intervals for each time slot
+combined = Array(intervalsPerDay).fill(0)
+for each LPAR:
+    intervals = getLparStats(lpar, date).intervals
+    for each interval i:
+        combined[i] += intervals[i]
+
+// Step 2: Calculate metric from combined intervals
+if metric === "Max":
+    result = Math.max(...combined)
+else if metric === "Avg":
+    result = sum(combined) / intervalsPerDay
+else if metric.startsWith('p'):
+    result = calculatePercentile(combined, percentile/100)
+```
+
+**Use Case:** Shows the actual simultaneous peak usage across all LPARs at the same moment in time. This is the most accurate representation of real resource consumption.
+
+**Example:**
+```
+Time 10:00 - LPAR1: 8.5, LPAR2: 7.2, LPAR3: 6.8 → Combined: 22.5
+Time 10:05 - LPAR1: 9.0, LPAR2: 6.8, LPAR3: 7.1 → Combined: 22.9
+Time 10:10 - LPAR1: 8.2, LPAR2: 7.5, LPAR3: 6.5 → Combined: 22.2
+
+Max = 22.9 cores (at 10:05)
+```
+
+#### 2. Capacity Planning (Sum of Metrics - Same Day)
+
+Sums each LPAR's metric calculated independently, where peaks can occur at different times within the same day.
+
+**Algorithm:**
+```javascript
+// Step 1: Calculate metric for each LPAR independently
+dailyValue = 0
+for each LPAR in pool:
+    intervals = getLparStats(lpar, date).intervals
+    
+    if metric === "Max":
+        lparMetric = Math.max(...intervals)
+    else if metric === "Avg":
+        lparMetric = sum(intervals) / intervalsPerDay
+    else if metric.startsWith('p'):
+        lparMetric = calculatePercentile(intervals, percentile/100)
+    
+    dailyValue += lparMetric
+```
+
+**Use Case:** Capacity planning where each LPAR's peak might occur at different times on the same day. Provides a more conservative estimate than actual usage.
+
+**Example:**
+```
+LPAR1: Max = 9.0 cores (at 10:05)
+LPAR2: Max = 7.5 cores (at 14:30)
+LPAR3: Max = 7.1 cores (at 16:45)
+
+Total = 9.0 + 7.5 + 7.1 = 23.6 cores
+```
+
+**Note:** This is higher than actual usage (22.9) because the peaks don't occur simultaneously.
+
+#### 3. Capacity Planning (LPAR Daily Metric)
+
+Similar to method 2, but explicitly uses LPAR-level daily metrics before summing.
+
+**Algorithm:**
+```javascript
+// Calculate each LPAR's daily metric, then sum
+dailyValue = 0
+for each LPAR:
+    intervals = getLparStats(lpar, date).intervals
+    lparDailyMetric = calculateMetric(intervals, metric)
+    dailyValue += lparDailyMetric
+```
+
+**Use Case:** Ensures consistent LPAR-level metric calculation before aggregation.
+
+#### 4. Capacity Planning (Different Day - Pool Level)
+
+Sums each pool's best metric across different days - the most conservative pool-based approach.
+
+**Algorithm:**
+```javascript
+// Step 1: Find best day for each pool independently
+totalPlanning = 0
+for each pool:
+    poolDailyValues = []
+    for each date:
+        poolDayValue = 0
+        for each LPAR in pool:
+            intervals = getLparStats(lpar, date).intervals
+            poolDayValue += calculateMetric(intervals, metric)
+        poolDailyValues.push(poolDayValue)
+    
+    // Step 2: Take the maximum day for this pool
+    totalPlanning += Math.max(...poolDailyValues)
+```
+
+**Use Case:** Conservative capacity planning where each pool's peak can occur on different days.
+
+**Example:**
+```
+IST1 Pool:
+  - Day 1: 38.5 cores
+  - Day 2: 40.66 cores ← Best day
+  - Day 3: 39.2 cores
+
+WASND1 Pool:
+  - Day 1: 1.30 cores ← Best day
+  - Day 2: 1.15 cores
+  - Day 3: 1.20 cores
+
+Total = 40.66 + 1.30 = 41.96 cores
+```
+
+#### 5. Capacity Planning (Different Day - LPAR Level)
+
+Sums each LPAR's best metric across different days - the most conservative LPAR-based approach.
+
+**Algorithm:**
+```javascript
+// Find best day for each LPAR independently
+totalPlanning = 0
+for each LPAR:
+    lparDailyValues = []
+    for each date:
+        intervals = getLparStats(lpar, date).intervals
+        lparMetric = calculateMetric(intervals, metric)
+        lparDailyValues.push(lparMetric)
+    
+    // Take the maximum day for this LPAR
+    totalPlanning += Math.max(...lparDailyValues)
+```
+
+**Use Case:** Most conservative approach - each LPAR's individual peak across all days, regardless of when they occur.
+
+### Dashboard Display Calculations
+
+#### Machine Summary Statistics
+
+```javascript
+// Calculate daily values for the selected date range
+machineDaily = dates.map(date => {
+    combined = Array(intervalsPerDay).fill(0)
+    
+    for each pool in selected pools:
+        for each LPAR in pool:
+            intervals = getLparStats(lpar, date).intervals
+            for each interval i:
+                combined[i] += intervals[i]
+    
+    return calculateMetric(combined, selectedMetric)
+})
+
+// Display statistics
+Machine Min = Math.min(...machineDaily)
+Machine Max = Math.max(...machineDaily)
+```
+
+#### Pool Breakdown Statistics
+
+```javascript
+// For each pool, calculate daily values
+poolDaily = dates.map(date => {
+    combined = Array(intervalsPerDay).fill(0)
+    
+    for each LPAR in pool:
+        intervals = getLparStats(lpar, date).intervals
+        for each interval i:
+            combined[i] += intervals[i]
+    
+    return calculateMetric(combined, selectedMetric)
+})
+
+Pool Min = Math.min(...poolDaily)
+Pool Max = Math.max(...poolDaily)
+```
+
+### Graph Visualization
+
+#### Stacked Bar Chart (Actual Usage)
+- Each bar shows the simultaneous peak for that day
+- Pools are stacked to show their contribution at the machine's peak interval
+- Ensures accurate representation of actual concurrent usage
+- The visible top of the stacked bars matches the machine total
+
+#### Stacked Bar Chart (Capacity Planning)
+- Each bar shows the sum of independent pool/LPAR metrics
+- May exceed actual usage since peaks can occur at different times
+- Used for conservative capacity planning
+- Each pool's contribution is its independent metric for that day
+
+### Key Formulas
+
+#### Percentile Calculation (INC method)
+```javascript
+sortedArray = sort(intervals)
+index = (sortedArray.length - 1) * percentile
+lower = Math.floor(index)
+upper = Math.ceil(index)
+weight = index - lower
+result = sortedArray[lower] * (1 - weight) + sortedArray[upper] * weight
+```
+
+#### Max Calculation
+```javascript
+max = Math.max(...intervals)
+```
+
+#### Average Calculation
+```javascript
+avg = sum(intervals) / intervals.length
+```
+
+### Comparison of Methods
+
+| Method | Timing | Value Relative | Best For |
+|--------|--------|----------------|----------|
+| Actual Usage | Same interval | Lowest (realistic) | Current utilization analysis |
+| Capacity Planning (same day) | Same day, different intervals | Medium | Hardware sizing for busy days |
+| Capacity Planning (different day - pool) | Different days per pool | Higher | Conservative pool-based planning |
+| Capacity Planning (different day - LPAR) | Different days per LPAR | Highest (most conservative) | Maximum envelope planning |
+
+### Practical Example
+
+**Scenario:** 3 LPARs with 5-minute intervals on 10/1/2025
+
+**Raw Data:**
+```
+Time    LPAR1   LPAR2   LPAR3
+10:00   8.5     7.2     6.8
+10:05   9.0     6.8     7.1
+10:10   8.2     7.5     6.5
+...
+14:30   8.0     7.5     6.9
+16:45   7.8     7.0     7.1
+```
+
+**Actual Usage (Max):**
+```
+Combined[10:00] = 8.5 + 7.2 + 6.8 = 22.5
+Combined[10:05] = 9.0 + 6.8 + 7.1 = 22.9 ← Maximum
+Combined[10:10] = 8.2 + 7.5 + 6.5 = 22.2
+...
+Result: 22.9 cores (at 10:05)
+```
+
+**Capacity Planning (Max - same day):**
+```
+LPAR1 Max = 9.0 (at 10:05)
+LPAR2 Max = 7.5 (at 14:30)
+LPAR3 Max = 7.1 (at 16:45)
+Result: 9.0 + 7.5 + 7.1 = 23.6 cores
+```
+
+**Difference:** 23.6 - 22.9 = 0.7 cores represents the capacity buffer needed when peaks don't align.
+
+### Best Practices
+
+1. **For Real-Time Monitoring:** Use "Actual Usage" with "Max" metric
+2. **For Capacity Planning:** Use "Capacity Planning (sum of metrics)" with P95 or Max
+3. **For Conservative Planning:** Use "Capacity Planning (different day)" methods
+4. **For Trend Analysis:** Use date range filters to focus on specific periods
+5. **For Exceedance Analysis:** Use percentile metrics (P90, P95) with capacity planning modes
+
+### When to Use Each Method
+
+- **Actual Usage**: Understanding current utilization, identifying over-provisioning, performance troubleshooting
+- **Capacity Planning (same day)**: Sizing new hardware when workloads are expected to be busy on the same day
+- **Capacity Planning (different day - pool)**: Evaluating conservative sizing where each pool can contribute its best day
+- **Capacity Planning (different day - LPAR)**: Maximum envelope planning where each LPAR can peak independently across different days
+
 ## UI Updates
 
 Recent interface updates in [visualizer.html](visualizer.html) include:
